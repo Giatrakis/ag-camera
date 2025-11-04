@@ -9,7 +9,13 @@ import SwiftUI
 import ag_camera
 
 struct ContentView: View {
+    @State private var cameraManager = AGCameraManager()
+    
     var body: some View {
-        AGCameraView()
+        AGCameraView(manager: cameraManager) { image in
+            
+        } onVideoRecordingStopped: { url in
+            
+        }
     }
 }

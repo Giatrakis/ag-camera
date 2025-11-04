@@ -13,7 +13,8 @@ class AGCaptureManager: NSObject {
 
     private let sessionManager: AGSessionManager
     private var photoCaptureCompletion: ((Result<Data, Error>) -> Void)?
-    private var videoRecordingCompletion: ((Result<URL, Error>) -> Void)?
+    private var videoRecordingStartCompletion: ((Result<URL, Error>) -> Void)?
+    private var videoRecordingStopCompletion: ((Result<URL, Error>) -> Void)?
 
     var flashMode: AVCaptureDevice.FlashMode = .off
 
@@ -64,7 +65,7 @@ class AGCaptureManager: NSObject {
         onRecordingStateChanged?(true, 0.0)
 
         return try await withCheckedThrowingContinuation { continuation in
-            self.videoRecordingCompletion = { result in
+            self.videoRecordingStartCompletion = { result in
                 continuation.resume(with: result)
             }
 
@@ -76,10 +77,20 @@ class AGCaptureManager: NSObject {
         }
     }
 
-    func stopVideoRecording() {
-        guard let movieFileOutput = sessionManager.movieFileOutput else { return }
+    func stopVideoRecording() async throws -> URL {
+        guard let movieFileOutput = sessionManager.movieFileOutput else {
+            throw CameraError.recordingFailed
+        }
 
-        if movieFileOutput.isRecording {
+        guard movieFileOutput.isRecording else {
+            throw CameraError.recordingFailed
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            self.videoRecordingStopCompletion = { result in
+                continuation.resume(with: result)
+            }
+
             movieFileOutput.stopRecording()
         }
     }
@@ -131,6 +142,10 @@ extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
             }
 
             Self.logger.info("Recording started at: \(fileURL)")
+
+            // Notify that recording started successfully
+            self.videoRecordingStartCompletion?(.success(fileURL))
+            self.videoRecordingStartCompletion = nil
         }
     }
 
@@ -151,15 +166,14 @@ extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
             self.onRecordingStateChanged?(false, 0.0)
 
             Self.logger.info("Recording stopped. Duration was: \(String(format: "%.1f", finalDuration))s")
-        }
 
-        if let error = error {
-            videoRecordingCompletion?(.failure(error))
-            videoRecordingCompletion = nil
-            return
+            // Notify that recording stopped with final URL
+            if let error = error {
+                self.videoRecordingStopCompletion?(.failure(error))
+            } else {
+                self.videoRecordingStopCompletion?(.success(outputFileURL))
+            }
+            self.videoRecordingStopCompletion = nil
         }
-
-        videoRecordingCompletion?(.success(outputFileURL))
-        videoRecordingCompletion = nil
     }
 }

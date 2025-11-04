@@ -4,99 +4,121 @@ import OSLog
 
 public struct AGCameraView: View {
     private static let logger = Logger(subsystem: "com.agcamera", category: "CameraView")
-    @State private var permissionManager = AGPermissionManager()
-    @State private var cameraManager: AGCameraManager?
+    @Bindable var manager: AGCameraManager
+    private let configuration: AGCameraConfiguration
+
+    public var onPhotoCaptured: ((UIImage) -> Void)?
+    public var onVideoRecordingStarted: ((URL) -> Void)?
+    public var onVideoRecordingStopped: ((URL) -> Void)?
+    public var onFlashModeChanged: ((AVCaptureDevice.FlashMode) -> Void)?
+    public var onCameraPositionChanged: ((AVCaptureDevice.Position) -> Void)?
+    public var onZoomChanged: ((CGFloat) -> Void)?
+    public var onError: ((Error) -> Void)?
+
     @State private var capturedImage: UIImage?
-    @State private var showImagePreview = false
     @State private var showError = false
     @State private var focusPoint: CGPoint?
     @State private var showFocusIndicator = false
     @State private var focusTask: Task<Void, Never>?
     @State private var flipRotation: Double = 0
     @State private var isBlurred: Bool = false
-    
+
     @Environment(\.scenePhase) private var scenePhase
 
     private var controlsOpacity: Double {
-        guard let cameraManager = cameraManager else { return 1.0 }
-        return cameraManager.currentZoomFactor >= 3.0 ? 0.3 : 1.0
+        manager.currentZoomFactor >= 3.0 ? 0.3 : 1.0
     }
-    
-    public init() {}
+
+    public init(
+        manager: AGCameraManager,
+        configuration: AGCameraConfiguration = .default,
+        onPhotoCaptured: ((UIImage) -> Void)? = nil,
+        onVideoRecordingStarted: ((URL) -> Void)? = nil,
+        onVideoRecordingStopped: ((URL) -> Void)? = nil,
+        onFlashModeChanged: ((AVCaptureDevice.FlashMode) -> Void)? = nil,
+        onCameraPositionChanged: ((AVCaptureDevice.Position) -> Void)? = nil,
+        onZoomChanged: ((CGFloat) -> Void)? = nil,
+        onError: ((Error) -> Void)? = nil
+    ) {
+        self.manager = manager
+        self.configuration = configuration
+        self.onPhotoCaptured = onPhotoCaptured
+        self.onVideoRecordingStarted = onVideoRecordingStarted
+        self.onVideoRecordingStopped = onVideoRecordingStopped
+        self.onFlashModeChanged = onFlashModeChanged
+        self.onCameraPositionChanged = onCameraPositionChanged
+        self.onZoomChanged = onZoomChanged
+        self.onError = onError
+    }
     
     public var body: some View {
         ZStack {
-            if let cameraManager = cameraManager {
-                GeometryReader { previewGeometry in
-                    AGCameraPreview(
-                        session: cameraManager.getCaptureSession(),
-                        cameraPosition: cameraManager.currentCameraPosition
-                    )
-                    .ignoresSafeArea()
-                    .onTapGesture { location in
-                        handleTapToFocus(at: location, in: previewGeometry.size)
-                    }
-                    .gesture(
-                        MagnificationGesture()
-                            .onChanged { value in
-                                try? cameraManager.updateZoomInteractively(scale: value, isGestureEnded: false)
-                            }
-                            .onEnded { value in
-                                try? cameraManager.updateZoomInteractively(scale: value, isGestureEnded: true)
-                            }
-                    )
-                    .blur(radius: isBlurred ? 20 : 0)
-                    .rotation3DEffect(
-                        .degrees(flipRotation),
-                        axis: (x: 0, y: 1, z: 0)
-                    )
-                    .overlay {
-                        if showFocusIndicator, let point = focusPoint {
-                            FocusIndicatorView()
-                                .position(point)
-                                .allowsHitTesting(false)
+            GeometryReader { previewGeometry in
+                AGCameraPreview(
+                    session: manager.getCaptureSession(),
+                    videoGravity: configuration.videoGravity,
+                    cameraPosition: manager.currentCameraPosition
+                )
+                .ignoresSafeArea()
+                .onTapGesture { location in
+                    handleTapToFocus(at: location, in: previewGeometry.size)
+                }
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            try? manager.updateZoomInteractively(scale: value, isGestureEnded: false)
                         }
+                        .onEnded { value in
+                            try? manager.updateZoomInteractively(scale: value, isGestureEnded: true)
+                        }
+                )
+                .blur(radius: isBlurred ? 20 : 0)
+                .rotation3DEffect(
+                    .degrees(flipRotation),
+                    axis: (x: 0, y: 1, z: 0)
+                )
+                .overlay {
+                    if showFocusIndicator, let point = focusPoint {
+                        configuration.focusIndicator
+                            .position(point)
+                            .allowsHitTesting(false)
                     }
                 }
-            } else {
-                Color.black.ignoresSafeArea()
             }
             
-            VStack {
-                topBar
-                    .padding()
-                    .opacity(controlsOpacity)
-                    .animation(.easeInOut(duration: 0.3), value: controlsOpacity)
-                
-                Spacer()
+            if configuration.showDefaultControls {
+                VStack {
+                    topBar
+                        .padding()
+                        .opacity(controlsOpacity)
+                        .animation(.easeInOut(duration: 0.3), value: controlsOpacity)
 
-                if let manager = cameraManager, manager.isRecording {
-                    recordingTimer
-                        .padding(.top, 20)
-                }
+                    Spacer()
 
-                if cameraManager != nil {
+                    if manager.isRecording {
+                        recordingTimer
+                            .padding(.top, 20)
+                    }
+
                     zoomIndicator
                         .padding(.bottom, 10)
-                }
 
-                if cameraManager != nil {
                     zoomButtons
                         .padding(.bottom, 20)
-                        .id(cameraManager?.currentCameraPosition)
-                }
+                        .id(manager.currentCameraPosition)
 
-                bottomBar
-                    .padding()
-                    .opacity(controlsOpacity)
-                    .animation(.easeInOut(duration: 0.3), value: controlsOpacity)
+                    bottomBar
+                        .padding()
+                        .opacity(controlsOpacity)
+                        .animation(.easeInOut(duration: 0.3), value: controlsOpacity)
+                }
             }
         }
         .task {
             await setupCamera()
         }
         .onDisappear {
-            cameraManager?.stopSession()
+            manager.stopSession()
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             handleScenePhaseChange(from: oldPhase, to: newPhase)
@@ -106,24 +128,17 @@ public struct AGCameraView: View {
                 showError = false
             }
         } message: {
-            Text(cameraManager?.error?.localizedDescription ?? "Unknown error")
-        }
-        .sheet(isPresented: $showImagePreview) { [capturedImage] in
-            if let image = capturedImage {
-                ImagePreviewView(image: image, onDismiss: {
-                    showImagePreview = false
-                    self.capturedImage = nil
-                })
-            }
+            Text(manager.error?.localizedDescription ?? "Unknown error")
         }
     }
     
     private var topBar: some View {
         HStack {
             Button(action: {
-                cameraManager?.toggleFlash()
+                manager.toggleFlash()
+                onFlashModeChanged?(manager.flashMode)
             }) {
-                Image(systemName: cameraManager?.flashIconName ?? "bolt.slash")
+                Image(systemName: manager.flashIconName)
                     .font(.title2)
                     .foregroundColor(.white)
                     .padding(12)
@@ -133,7 +148,7 @@ public struct AGCameraView: View {
             Spacer()
 
             Button(action: {
-                try? cameraManager?.setSessionPreset(.hd4K3840x2160)
+                try? manager.setSessionPreset(.hd4K3840x2160)
             }) {
                 Image(systemName: "gear")
                     .font(.title2)
@@ -148,7 +163,7 @@ public struct AGCameraView: View {
         HStack(spacing: 40) {
             Button(action: {
                 Task {
-                    await switchCameraWithAnimation()
+                    await switchCamera()
                 }
             }) {
                 Image(systemName: "camera.rotate")
@@ -181,10 +196,10 @@ public struct AGCameraView: View {
             }) {
                 ZStack {
                     Circle()
-                        .fill(cameraManager?.isRecording == true ? Color.red : Color.white.opacity(0.8))
+                        .fill(manager.isRecording ? Color.red : Color.white.opacity(0.8))
                         .frame(width: 50, height: 50)
 
-                    if cameraManager?.isRecording == true {
+                    if manager.isRecording {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.white)
                             .frame(width: 20, height: 20)
@@ -196,8 +211,8 @@ public struct AGCameraView: View {
     
     private var zoomButtons: some View {
         HStack(spacing: 15) {
-            let availableLevels = cameraManager?.availableZoomLevels ?? [1.0]
-            let currentZoom = cameraManager?.currentZoomFactor ?? 1.0
+            let availableLevels = manager.availableZoomLevels
+            let currentZoom = manager.currentZoomFactor
 
             ForEach(availableLevels, id: \.self) { level in
                 ZoomButton(level: level, currentZoom: currentZoom) {
@@ -206,9 +221,9 @@ public struct AGCameraView: View {
             }
         }
     }
-    
+
     private var zoomIndicator: some View {
-        Text(String(format: "%.1f×", cameraManager?.currentZoomFactor ?? 1.0))
+        Text(String(format: "%.1f×", manager.currentZoomFactor))
             .font(.headline)
             .foregroundColor(.white)
             .padding(.horizontal, 16)
@@ -218,12 +233,12 @@ public struct AGCameraView: View {
                     .fill(Color.black.opacity(0.6))
             )
     }
-    
+
     private var recordingTimer: some View {
         HStack(spacing: 8) {
             RecordingDot()
 
-            Text(cameraManager?.formattedRecordingDuration ?? "00:00")
+            Text(manager.formattedRecordingDuration)
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
@@ -237,18 +252,7 @@ public struct AGCameraView: View {
         )
     }
 
-
     private func setupCamera() async {
-        let result = await permissionManager.requestAllPermissions()
-
-        guard result.camera else {
-            showError = true
-            return
-        }
-
-        let manager = AGCameraManager(permissionManager: permissionManager)
-        cameraManager = manager
-
         do {
             try await manager.setupSession()
             manager.startSession()
@@ -256,37 +260,45 @@ public struct AGCameraView: View {
             Self.logger.info("Camera Info - Min Zoom: \(String(format: "%.1f", manager.minZoomFactor))×, Max Zoom: \(String(format: "%.1f", manager.maxZoomFactor))×, Current Zoom: \(String(format: "%.1f", manager.currentZoomFactor))×")
         } catch {
             showError = true
+            onError?(error)
         }
     }
 
     private func capturePhoto() async {
-        guard let cameraManager = cameraManager else { return }
-
         do {
-            let imageData = try await cameraManager.capturePhoto()
+            let imageData = try await manager.capturePhoto()
 
             if let image = UIImage(data: imageData) {
                 capturedImage = image
+                onPhotoCaptured?(image)
                 await MainActor.run {
-                    showImagePreview = true
+                    self.capturedImage = nil
                 }
             }
         } catch {
             showError = true
+            onError?(error)
         }
     }
 
     private func toggleVideoRecording() async {
-        guard let cameraManager = cameraManager else { return }
-
-        if cameraManager.isRecording {
-            cameraManager.stopVideoRecording()
-        } else {
+        if manager.isRecording {
             do {
-                let videoURL = try await cameraManager.startVideoRecording()
-                Self.logger.info("Video saved to: \(videoURL)")
+                let videoURL = try await manager.stopVideoRecording()
+                onVideoRecordingStopped?(videoURL)
+                Self.logger.info("Video recording stopped: \(videoURL)")
             } catch {
                 showError = true
+                onError?(error)
+            }
+        } else {
+            do {
+                let videoURL = try await manager.startVideoRecording()
+                onVideoRecordingStarted?(videoURL)
+                Self.logger.info("Video recording started: \(videoURL)")
+            } catch {
+                showError = true
+                onError?(error)
             }
         }
     }
@@ -302,7 +314,7 @@ public struct AGCameraView: View {
             y: location.y / viewSize.height
         )
 
-        try? cameraManager?.setFocusAndExposure(at: normalizedPoint)
+        try? manager.setFocusAndExposure(at: normalizedPoint)
 
         focusTask = Task {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -314,20 +326,18 @@ public struct AGCameraView: View {
     }
 
     private func setZoom(to level: CGFloat) {
-        guard let cameraManager = cameraManager else { return }
-
         do {
-            try cameraManager.setZoom(factor: level)
+            try manager.setZoom(factor: level)
+            onZoomChanged?(level)
         } catch {
             Self.logger.error("Zoom error: \(error.localizedDescription)")
             showError = true
+            onError?(error)
         }
     }
 
-    private func switchCameraWithAnimation() async {
-        guard let cameraManager = cameraManager else { return }
-
-        let flipDirection: Double = cameraManager.currentCameraPosition == .back ? 180 : -180
+    private func switchCamera() async {
+        let flipDirection: Double = manager.currentCameraPosition == .back ? 180 : -180
 
         withAnimation(.easeOut(duration: 0.1)) {
             isBlurred = true
@@ -339,7 +349,8 @@ public struct AGCameraView: View {
 
         try? await Task.sleep(nanoseconds: 250_000_000)
 
-        try? await cameraManager.switchCamera()
+        try? await manager.switchCamera()
+        onCameraPositionChanged?(manager.currentCameraPosition)
 
         try? await Task.sleep(nanoseconds: 100_000_000)
 
@@ -349,18 +360,13 @@ public struct AGCameraView: View {
     }
 
     private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
-        guard let cameraManager = cameraManager else { return }
-
         switch newPhase {
         case .background:
-            cameraManager.handleAppBackground()
-
+            manager.handleAppBackground()
         case .active:
-            cameraManager.handleAppForeground()
-
+            manager.handleAppForeground()
         case .inactive:
             break
-
         @unknown default:
             break
         }
@@ -425,10 +431,12 @@ private struct ZoomButton: View {
     }
 }
 
-private struct FocusIndicatorView: View {
+public struct FocusIndicatorView: View {
     @State private var animate = false
+    
+    public init() {}
 
-    var body: some View {
+    public var body: some View {
         RoundedRectangle(cornerRadius: 4)
             .stroke(Color.yellow, lineWidth: 2)
             .frame(width: 80, height: 80)
@@ -459,13 +467,6 @@ private struct RecordingDot: View {
 }
 
 #Preview {
-    AGCameraView()
+    let cameraManager = AGCameraManager()
+    return AGCameraView(manager: cameraManager)
 }
-
-public var onPhotoCaptured: ((UIImage) -> Void)?
-public var onVideoRecordingStarted: ((URL) -> Void)? = nil
-public var onVideoCaptured: ((URL) -> Void)?
-public var onFlashModeChanged: ((AVCaptureDevice.FlashMode) -> Void)? = nil
-public var onCameraPositionChanged: ((AVCaptureDevice.Position) -> Void)? = nil
-public var onZoomChanged: ((CGFloat) -> Void)? = nil
-public var onError: ((Error) -> Void)? = nil

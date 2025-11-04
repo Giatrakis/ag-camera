@@ -23,7 +23,7 @@ class AGZoomManager {
         self.sessionManager = sessionManager
     }
 
-    func setZoom(factor: CGFloat) throws -> CGFloat {
+    @discardableResult func setZoom(factor: CGFloat) throws -> CGFloat {
         guard let device = sessionManager.currentDevice else {
             Self.logger.error("No current device available for zoom")
             throw CameraError.cameraNotAvailable

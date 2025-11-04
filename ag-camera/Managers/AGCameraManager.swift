@@ -31,10 +31,14 @@ public class AGCameraManager: NSObject {
     private let zoomManager: AGZoomManager
     private let qualitySettings: AGQualitySettingsManager
     private let mediaLibrary: AGMediaLibraryManager
-    private let permissionManager: AGPermissionManager
+    private let configuration: AGCameraConfiguration
 
-    public init(permissionManager: AGPermissionManager) {
-        self.permissionManager = permissionManager
+    public let permissionManager: AGPermissionManager
+
+    public init(configuration: AGCameraConfiguration = .default) {
+        self.configuration = configuration
+        self.permissionManager = AGPermissionManager()
+        self.currentCameraPosition = configuration.defaultCameraPosition
 
         self.sessionManager = AGSessionManager(permissionManager: permissionManager)
         self.captureManager = AGCaptureManager(sessionManager: sessionManager)
@@ -45,6 +49,10 @@ public class AGCameraManager: NSObject {
         self.mediaLibrary = AGMediaLibraryManager(permissionManager: permissionManager)
 
         super.init()
+
+        // Apply default flash mode
+        self.flashMode = configuration.defaultFlashMode
+        self.captureManager.flashMode = configuration.defaultFlashMode
 
         captureManager.onRecordingStateChanged = { [weak self] isRecording, duration in
             guard let self = self else { return }
@@ -61,10 +69,12 @@ public class AGCameraManager: NSObject {
 extension AGCameraManager {
 
     public func setupSession() async throws {
-        guard permissionManager.isCameraAuthorized else {
-            let error = CameraError.permissionDenied
-            self.error = error
-            throw error
+        if configuration.handlePermissions {
+            guard permissionManager.isCameraAuthorized else {
+                let error = CameraError.permissionDenied
+                self.error = error
+                throw error
+            }
         }
 
         do {
@@ -96,7 +106,8 @@ extension AGCameraManager {
     }
 
     public func handleAppForeground() {
-        if !isSessionRunning && permissionManager.isCameraAuthorized {
+        let hasPermission = configuration.handlePermissions ? permissionManager.isCameraAuthorized : true
+        if !isSessionRunning && hasPermission {
             startSession()
         }
     }
@@ -123,8 +134,8 @@ extension AGCameraManager {
         return try await captureManager.startVideoRecording()
     }
 
-    public func stopVideoRecording() {
-        captureManager.stopVideoRecording()
+    public func stopVideoRecording() async throws -> URL {
+        return try await captureManager.stopVideoRecording()
     }
 }
 
