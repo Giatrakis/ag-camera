@@ -19,7 +19,8 @@ public struct AGCameraPreview: UIViewRepresentable {
 
     public init(
         session: AVCaptureSession,
-        videoGravity: AVLayerVideoGravity = .resizeAspect,
+        videoGravity: AVLayerVideoGravity = .resizeAspectFill,
+//        videoGravity: AVLayerVideoGravity = .resizeAspect,
         cameraPosition: AVCaptureDevice.Position = .back
     ) {
         self.session = session
