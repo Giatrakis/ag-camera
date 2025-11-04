@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		FAD35EF92EB4E2F0004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
+		FAD35F1F2EB4E99B004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
+		FAD35F202EB4E99B004AF78D /* ag_camera.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -18,11 +20,33 @@
 			remoteGlobalIDString = FAD35EEC2EB4E2F0004AF78D;
 			remoteInfo = "ag-camera";
 		};
+		FAD35F212EB4E99B004AF78D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FAD35EE42EB4E2F0004AF78D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FAD35EEC2EB4E2F0004AF78D;
+			remoteInfo = "ag-camera";
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		FAD35F232EB4E99B004AF78D /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				FAD35F202EB4E99B004AF78D /* ag_camera.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ag_camera.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAD35EF82EB4E2F0004AF78D /* ag-cameraTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "ag-cameraTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		FAD35F132EB4E8E9004AF78D /* ag-camera-app.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ag-camera-app.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -34,6 +58,11 @@
 		FAD35EFC2EB4E2F0004AF78D /* ag-cameraTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "ag-cameraTests";
+			sourceTree = "<group>";
+		};
+		FAD35F142EB4E8E9004AF78D /* ag-camera-app */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "ag-camera-app";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -54,6 +83,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FAD35F102EB4E8E9004AF78D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FAD35F1F2EB4E99B004AF78D /* ag_camera.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -62,6 +99,8 @@
 			children = (
 				FAD35EEF2EB4E2F0004AF78D /* ag-camera */,
 				FAD35EFC2EB4E2F0004AF78D /* ag-cameraTests */,
+				FAD35F142EB4E8E9004AF78D /* ag-camera-app */,
+				FAD35F1E2EB4E99B004AF78D /* Frameworks */,
 				FAD35EEE2EB4E2F0004AF78D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -71,8 +110,16 @@
 			children = (
 				FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */,
 				FAD35EF82EB4E2F0004AF78D /* ag-cameraTests.xctest */,
+				FAD35F132EB4E8E9004AF78D /* ag-camera-app.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		FAD35F1E2EB4E99B004AF78D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -134,6 +181,30 @@
 			productReference = FAD35EF82EB4E2F0004AF78D /* ag-cameraTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		FAD35F122EB4E8E9004AF78D /* ag-camera-app */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FAD35F1B2EB4E8EB004AF78D /* Build configuration list for PBXNativeTarget "ag-camera-app" */;
+			buildPhases = (
+				FAD35F0F2EB4E8E9004AF78D /* Sources */,
+				FAD35F102EB4E8E9004AF78D /* Frameworks */,
+				FAD35F112EB4E8E9004AF78D /* Resources */,
+				FAD35F232EB4E99B004AF78D /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FAD35F222EB4E99B004AF78D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				FAD35F142EB4E8E9004AF78D /* ag-camera-app */,
+			);
+			name = "ag-camera-app";
+			packageProductDependencies = (
+			);
+			productName = "ag-camera-app";
+			productReference = FAD35F132EB4E8E9004AF78D /* ag-camera-app.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -148,6 +219,9 @@
 						CreatedOnToolsVersion = 26.0;
 					};
 					FAD35EF72EB4E2F0004AF78D = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					FAD35F122EB4E8E9004AF78D = {
 						CreatedOnToolsVersion = 26.0;
 					};
 				};
@@ -168,6 +242,7 @@
 			targets = (
 				FAD35EEC2EB4E2F0004AF78D /* ag-camera */,
 				FAD35EF72EB4E2F0004AF78D /* ag-cameraTests */,
+				FAD35F122EB4E8E9004AF78D /* ag-camera-app */,
 			);
 		};
 /* End PBXProject section */
@@ -181,6 +256,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		FAD35EF62EB4E2F0004AF78D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FAD35F112EB4E8E9004AF78D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -204,6 +286,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FAD35F0F2EB4E8E9004AF78D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -211,6 +300,11 @@
 			isa = PBXTargetDependency;
 			target = FAD35EEC2EB4E2F0004AF78D /* ag-camera */;
 			targetProxy = FAD35EFA2EB4E2F0004AF78D /* PBXContainerItemProxy */;
+		};
+		FAD35F222EB4E99B004AF78D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FAD35EEC2EB4E2F0004AF78D /* ag-camera */;
+			targetProxy = FAD35F212EB4E99B004AF78D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -452,6 +546,76 @@
 			};
 			name = Release;
 		};
+		FAD35F1C2EB4E8EB004AF78D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = S977N486XJ;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to take photos and record videos";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to record videos with audio";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos and videos to your library";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.giatrakis.camera.ag-camera-app";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		FAD35F1D2EB4E8EB004AF78D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = S977N486XJ;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to take photos and record videos";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to record videos with audio";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos and videos to your library";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.giatrakis.camera.ag-camera-app";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -478,6 +642,15 @@
 			buildConfigurations = (
 				FAD35F052EB4E2F0004AF78D /* Debug */,
 				FAD35F062EB4E2F0004AF78D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FAD35F1B2EB4E8EB004AF78D /* Build configuration list for PBXNativeTarget "ag-camera-app" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FAD35F1C2EB4E8EB004AF78D /* Debug */,
+				FAD35F1D2EB4E8EB004AF78D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
