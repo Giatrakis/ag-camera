@@ -107,14 +107,14 @@ public class AGPermissionManager {
     }
 
     /// Request all permissions needed for full camera functionality
-    public func requestAllPermissions() async -> AllPermissionsResult {
+    public func requestAllPermissions() async -> AGPermissionsResult {
         async let cameraGranted = requestCameraPermission()
         async let microphoneGranted = requestMicrophonePermission()
         async let photoLibraryGranted = requestPhotoLibraryPermission()
 
         let results = await (cameraGranted, microphoneGranted, photoLibraryGranted)
 
-        return AllPermissionsResult(
+        return AGPermissionsResult(
             camera: results.0,
             microphone: results.1,
             photoLibrary: results.2

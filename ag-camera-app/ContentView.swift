@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import ag_camera
+import AGCamera
 
 struct ContentView: View {
     @State private var cameraManager = AGCameraManager()
@@ -18,4 +18,8 @@ struct ContentView: View {
             
         }
     }
+}
+
+#Preview {
+    ContentView()
 }

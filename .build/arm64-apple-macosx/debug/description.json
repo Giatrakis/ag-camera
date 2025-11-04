@@ -1,0 +1,415 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.AGCamera-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/sources",
+      "importPath" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGCameraManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGCaptureManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGDeviceControlManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGFocusExposureManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGMediaLibraryManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGPermissionManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGQualitySettingsManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGSessionManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGZoomManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Models/AGCameraConfiguration.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Models/AGPermissionsResult.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Views/AGCameraPreview.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Views/AGCameraView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "AGCamera",
+      "moduleOutputPath" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/Modules/AGCamera.swiftmodule",
+      "objects" : [
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCameraManager.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCaptureManager.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGDeviceControlManager.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGFocusExposureManager.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGMediaLibraryManager.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGPermissionManager.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGQualitySettingsManager.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGSessionManager.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGZoomManager.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCameraConfiguration.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGPermissionsResult.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCameraPreview.swift.o",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCameraView.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx10.13",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/include/AGCamera-Swift.h",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "ag_camera"
+      ],
+      "outputFileMapPath" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCameraManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCaptureManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGDeviceControlManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGFocusExposureManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGMediaLibraryManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGPermissionManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGQualitySettingsManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGSessionManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGZoomManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCameraConfiguration.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGPermissionsResult.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCameraPreview.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/AGCameraView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/Modules/AGCamera.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGCameraManager.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGCaptureManager.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGDeviceControlManager.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGFocusExposureManager.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGMediaLibraryManager.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGPermissionManager.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGQualitySettingsManager.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGSessionManager.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGZoomManager.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Models/AGCameraConfiguration.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Models/AGPermissionsResult.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Views/AGCameraPreview.swift",
+        "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Views/AGCameraView.swift"
+      ],
+      "tempsPath" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "AGCamera" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "AGCamera",
+      "-package-name",
+      "ag_camera",
+      "-c",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGCameraManager.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGCaptureManager.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGDeviceControlManager.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGFocusExposureManager.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGMediaLibraryManager.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGPermissionManager.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGQualitySettingsManager.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGSessionManager.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGZoomManager.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Models/AGCameraConfiguration.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Models/AGPermissionsResult.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Views/AGCameraPreview.swift",
+      "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Views/AGCameraView.swift",
+      "-I",
+      "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx10.13",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/include/AGCamera-Swift.h",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "ag_camera",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "AGCamera" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGCameraManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGCaptureManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGDeviceControlManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGFocusExposureManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGMediaLibraryManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGPermissionManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGQualitySettingsManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGSessionManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Managers/AGZoomManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Models/AGCameraConfiguration.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Models/AGPermissionsResult.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Views/AGCameraPreview.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/alex/Desktop/Projects/ag-camera/Sources/AGCamera/Views/AGCameraView.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/sources"
+    },
+    "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}

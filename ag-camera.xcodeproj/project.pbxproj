@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FA89B3842EBAB94E00B6DD3F /* AGCamera in Frameworks */ = {isa = PBXBuildFile; productRef = FA89B3832EBAB94E00B6DD3F /* AGCamera */; };
 		FAD35EF92EB4E2F0004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
 		FAD35F1F2EB4E99B004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
 		FAD35F202EB4E99B004AF78D /* ag_camera.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -55,11 +56,6 @@
 			path = "ag-camera";
 			sourceTree = "<group>";
 		};
-		FAD35EFC2EB4E2F0004AF78D /* ag-cameraTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "ag-cameraTests";
-			sourceTree = "<group>";
-		};
 		FAD35F142EB4E8E9004AF78D /* ag-camera-app */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "ag-camera-app";
@@ -88,6 +84,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FAD35F1F2EB4E99B004AF78D /* ag_camera.framework in Frameworks */,
+				FA89B3842EBAB94E00B6DD3F /* AGCamera in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -98,9 +95,7 @@
 			isa = PBXGroup;
 			children = (
 				FAD35EEF2EB4E2F0004AF78D /* ag-camera */,
-				FAD35EFC2EB4E2F0004AF78D /* ag-cameraTests */,
 				FAD35F142EB4E8E9004AF78D /* ag-camera-app */,
-				FAD35F1E2EB4E99B004AF78D /* Frameworks */,
 				FAD35EEE2EB4E2F0004AF78D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -113,13 +108,6 @@
 				FAD35F132EB4E8E9004AF78D /* ag-camera-app.app */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		FAD35F1E2EB4E99B004AF78D /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -171,9 +159,6 @@
 			dependencies = (
 				FAD35EFB2EB4E2F0004AF78D /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				FAD35EFC2EB4E2F0004AF78D /* ag-cameraTests */,
-			);
 			name = "ag-cameraTests";
 			packageProductDependencies = (
 			);
@@ -200,6 +185,7 @@
 			);
 			name = "ag-camera-app";
 			packageProductDependencies = (
+				FA89B3832EBAB94E00B6DD3F /* AGCamera */,
 			);
 			productName = "ag-camera-app";
 			productReference = FAD35F132EB4E8E9004AF78D /* ag-camera-app.app */;
@@ -235,6 +221,9 @@
 			);
 			mainGroup = FAD35EE32EB4E2F0004AF78D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				FA89B3822EBAB94E00B6DD3F /* XCLocalSwiftPackageReference "../ag-camera" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = FAD35EEE2EB4E2F0004AF78D /* Products */;
 			projectDirPath = "";
@@ -656,6 +645,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		FA89B3822EBAB94E00B6DD3F /* XCLocalSwiftPackageReference "../ag-camera" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../ag-camera";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FA89B3832EBAB94E00B6DD3F /* AGCamera */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AGCamera;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FAD35EE42EB4E2F0004AF78D /* Project object */;
 }
