@@ -7,17 +7,33 @@
 
 import SwiftUI
 import AVFoundation
+import OSLog
 
-/// Example SwiftUI camera view demonstrating the library usage
-/// This shows how users can create their own custom camera UI by calling manager methods
 public struct AGCameraView: View {
+    enum UI {
+        static let captureButtonOuterSize: CGFloat = 70
+        static let captureButtonInnerSize: CGFloat = 60
+        static let captureButtonBorderWidth: CGFloat = 4
+        static let videoRecordingButtonSize: CGFloat = 50
+        static let videoRecordingStopIconSize: CGFloat = 20
+        static let videoRecordingStopCornerRadius: CGFloat = 4
+        static let controlButtonSize: CGFloat = 12
+        static let controlButtonBackgroundSize: CGFloat = 16
+        static let zoomButtonWidth: CGFloat = 44
+        static let zoomButtonHeight: CGFloat = 32
+        static let recordingDotSize: CGFloat = 12
+        static let focusIndicatorSize: CGFloat = 80
+        static let focusIndicatorCornerRadius: CGFloat = 4
+        static let focusIndicatorBorderWidth: CGFloat = 2
+        static let zoomSpacing: CGFloat = 15
+        static let controlSpacing: CGFloat = 40
+    }
 
-    // MARK: - State Objects
-
+    private static let logger = Logger(subsystem: "com.agcamera", category: "CameraView")
     @State private var permissionManager = AGPermissionManager()
     @State private var cameraManager: AGCameraManager?
-
     @State private var capturedImage: UIImage?
+    @State private var showImagePreview = false
     @State private var errorMessage: String?
     @State private var showError = false
 
@@ -34,15 +50,12 @@ public struct AGCameraView: View {
     @State private var cameraPosition: AVCaptureDevice.Position = .back
     @State private var flipRotation: Double = 0
     @State private var isBlurred: Bool = false
-
-    // MARK: - Body
-
-    public init() {}
+    
+    @Environment(\.scenePhase) private var scenePhase
 
     public var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Camera preview (full screen)
                 if let cameraManager = cameraManager {
                     AGCameraPreview(
                         session: cameraManager.getCaptureSession(),
@@ -52,7 +65,6 @@ public struct AGCameraView: View {
                         .clipped()
                         .ignoresSafeArea()
                         .onTapGesture { location in
-                            // Tap to focus using actual view size
                             handleTapToFocus(at: location, in: geometry.size)
                         }
                         .gesture(
@@ -73,16 +85,13 @@ public struct AGCameraView: View {
                     Color.black.ignoresSafeArea()
                 }
 
-                // Focus indicator
                 if showFocusIndicator, let point = focusPoint {
                     FocusIndicatorView()
                         .position(point)
-                        .allowsHitTesting(false) // Don't block taps
+                        .allowsHitTesting(false)
                 }
 
-                // Custom UI overlay
                 VStack {
-                    // Top bar with flash and settings
                     topBar
                         .padding()
 
@@ -119,19 +128,23 @@ public struct AGCameraView: View {
         .onDisappear {
             cameraManager?.stopSession()
         }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            handleScenePhaseChange(from: oldPhase, to: newPhase)
+        }
         .alert("Error", isPresented: $showError) {
             Button("OK") { }
         } message: {
             Text(errorMessage ?? "Unknown error")
         }
-        .sheet(item: $capturedImage) { image in
-            ImagePreviewView(image: image, onDismiss: {
-                capturedImage = nil
-            })
+        .sheet(isPresented: $showImagePreview) {
+            if let image = capturedImage {
+                ImagePreviewView(image: image, onDismiss: {
+                    showImagePreview = false
+                    capturedImage = nil
+                })
+            }
         }
     }
-
-    // MARK: - UI Components
 
     private var topBar: some View {
         HStack {
@@ -142,7 +155,7 @@ public struct AGCameraView: View {
                 Image(systemName: flashIcon)
                     .font(.title2)
                     .foregroundColor(.white)
-                    .padding(12)
+                    .padding(UI.controlButtonSize)
                     .background(Circle().fill(Color.black.opacity(0.5)))
             }
 
@@ -156,14 +169,14 @@ public struct AGCameraView: View {
                 Image(systemName: "gear")
                     .font(.title2)
                     .foregroundColor(.white)
-                    .padding(12)
+                    .padding(UI.controlButtonSize)
                     .background(Circle().fill(Color.black.opacity(0.5)))
             }
         }
     }
 
     private var bottomBar: some View {
-        HStack(spacing: 40) {
+        HStack(spacing: UI.controlSpacing) {
             // Switch camera button
             Button(action: {
                 Task {
@@ -173,7 +186,7 @@ public struct AGCameraView: View {
                 Image(systemName: "camera.rotate")
                     .font(.title)
                     .foregroundColor(.white)
-                    .padding(16)
+                    .padding(UI.controlButtonBackgroundSize)
                     .background(Circle().fill(Color.black.opacity(0.5)))
             }
 
@@ -185,12 +198,12 @@ public struct AGCameraView: View {
             }) {
                 ZStack {
                     Circle()
-                        .stroke(Color.white, lineWidth: 4)
-                        .frame(width: 70, height: 70)
+                        .stroke(Color.white, lineWidth: UI.captureButtonBorderWidth)
+                        .frame(width: UI.captureButtonOuterSize, height: UI.captureButtonOuterSize)
 
                     Circle()
                         .fill(Color.white)
-                        .frame(width: 60, height: 60)
+                        .frame(width: UI.captureButtonInnerSize, height: UI.captureButtonInnerSize)
                 }
             }
 
@@ -203,12 +216,12 @@ public struct AGCameraView: View {
                 ZStack {
                     Circle()
                         .fill(cameraManager?.isRecording == true ? Color.red : Color.white.opacity(0.8))
-                        .frame(width: 50, height: 50)
+                        .frame(width: UI.videoRecordingButtonSize, height: UI.videoRecordingButtonSize)
 
                     if cameraManager?.isRecording == true {
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: UI.videoRecordingStopCornerRadius)
                             .fill(Color.white)
-                            .frame(width: 20, height: 20)
+                            .frame(width: UI.videoRecordingStopIconSize, height: UI.videoRecordingStopIconSize)
                     }
                 }
             }
@@ -216,7 +229,7 @@ public struct AGCameraView: View {
     }
 
     private var zoomButtons: some View {
-        HStack(spacing: 15) {
+        HStack(spacing: UI.zoomSpacing) {
             // Get current camera's zoom capabilities
             let minZoom = cameraManager?.minZoomFactor ?? 1.0
             let maxZoom = cameraManager?.maxZoomFactor ?? 1.0
@@ -259,7 +272,7 @@ public struct AGCameraView: View {
 
     private var zoomIndicator: some View {
         Text(String(format: "%.1f×", currentZoom))
-            .font(.system(size: 18, weight: .medium))
+            .font(.headline)
             .foregroundColor(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -276,7 +289,8 @@ public struct AGCameraView: View {
 
             // Time display
             Text(formatRecordingDuration(cameraManager?.recordingDuration ?? 0))
-                .font(.system(size: 20, weight: .semibold))
+                .font(.title3)
+                .fontWeight(.semibold)
                 .foregroundColor(.white)
                 .monospacedDigit() // Prevents width changes as numbers update
         }
@@ -339,10 +353,7 @@ public struct AGCameraView: View {
             lastZoom = manager.currentZoomFactor
 
             // Log zoom capabilities (now showing UI zoom values)
-            print("📷 Camera Info:")
-            print("   Min Zoom: \(String(format: "%.1f", manager.minZoomFactor))×")
-            print("   Max Zoom: \(String(format: "%.1f", manager.maxZoomFactor))×")
-            print("   Current Zoom: \(String(format: "%.1f", manager.currentZoomFactor))×")
+            Self.logger.info("Camera Info - Min Zoom: \(String(format: "%.1f", manager.minZoomFactor))×, Max Zoom: \(String(format: "%.1f", manager.maxZoomFactor))×, Current Zoom: \(String(format: "%.1f", manager.currentZoomFactor))×")
         } catch {
             errorMessage = error.localizedDescription
             showError = true
@@ -361,6 +372,7 @@ public struct AGCameraView: View {
             // Convert to UIImage
             if let image = UIImage(data: imageData) {
                 capturedImage = image
+                showImagePreview = true
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -379,7 +391,7 @@ public struct AGCameraView: View {
             // Start recording
             do {
                 let videoURL = try await cameraManager.startVideoRecording()
-                print("Video saved to: \(videoURL)")
+                Self.logger.info("Video saved to: \(videoURL)")
                 // You can now save to photo library or process the video
             } catch {
                 errorMessage = error.localizedDescription
@@ -433,7 +445,7 @@ public struct AGCameraView: View {
         do {
             try cameraManager.setZoom(factor: clampedZoom)
         } catch {
-            print("❌ Zoom error: \(error)")
+            Self.logger.error("Zoom error: \(error.localizedDescription)")
         }
     }
 
@@ -451,7 +463,7 @@ public struct AGCameraView: View {
         do {
             try cameraManager.setZoom(factor: level)
         } catch {
-            print("❌ Zoom error: \(error)")
+            Self.logger.error("Zoom error: \(error.localizedDescription)")
             errorMessage = "Failed to zoom: \(error.localizedDescription)"
             showError = true
         }
@@ -502,6 +514,30 @@ public struct AGCameraView: View {
     private func easeInOut(_ t: CGFloat) -> CGFloat {
         return t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2
     }
+
+    // MARK: - App Lifecycle
+
+    /// Handle app moving to background/foreground (SwiftUI way)
+    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
+        guard let cameraManager = cameraManager else { return }
+
+        switch newPhase {
+        case .background:
+            // App moved to background
+            cameraManager.handleAppBackground()
+
+        case .active:
+            // App became active
+            cameraManager.handleAppForeground()
+
+        case .inactive:
+            // App becoming inactive (e.g., during phone call) - keep session running
+            break
+
+        @unknown default:
+            break
+        }
+    }
 }
 
 // MARK: - Image Preview View
@@ -550,9 +586,10 @@ private struct ZoomButton: View {
     var body: some View {
         Button(action: action) {
             Text(displayText)
-                .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                .font(.body)
+                .fontWeight(isActive ? .semibold : .regular)
                 .foregroundColor(isActive ? .black : .white)
-                .frame(width: 44, height: 32)
+                .frame(width: AGCameraView.UI.zoomButtonWidth, height: AGCameraView.UI.zoomButtonHeight)
                 .background(
                     Capsule()
                         .fill(isActive ? Color.yellow : Color.clear)
@@ -565,24 +602,15 @@ private struct ZoomButton: View {
     }
 }
 
-// MARK: - UIImage Extension
-
-extension UIImage: Identifiable {
-    public var id: String {
-        // Use memory address as unique identifier
-        return "\(Unmanaged.passUnretained(self).toOpaque())"
-    }
-}
-
 // MARK: - Focus Indicator View
 
 private struct FocusIndicatorView: View {
     @State private var animate = false
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .stroke(Color.yellow, lineWidth: 2)
-            .frame(width: 80, height: 80)
+        RoundedRectangle(cornerRadius: AGCameraView.UI.focusIndicatorCornerRadius)
+            .stroke(Color.yellow, lineWidth: AGCameraView.UI.focusIndicatorBorderWidth)
+            .frame(width: AGCameraView.UI.focusIndicatorSize, height: AGCameraView.UI.focusIndicatorSize)
             .scaleEffect(animate ? 1.0 : 0.8)
             .opacity(animate ? 1.0 : 0.8)
             .onAppear {
@@ -601,7 +629,7 @@ private struct RecordingDot: View {
     var body: some View {
         Circle()
             .fill(Color.red)
-            .frame(width: 12, height: 12)
+            .frame(width: AGCameraView.UI.recordingDotSize, height: AGCameraView.UI.recordingDotSize)
             .opacity(isPulsing ? 0.3 : 1.0)
             .onAppear {
                 withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {

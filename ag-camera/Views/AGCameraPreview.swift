@@ -8,22 +8,14 @@
 import SwiftUI
 import AVFoundation
 import UIKit
+import OSLog
 
-/// SwiftUI wrapper for AVCaptureVideoPreviewLayer
 public struct AGCameraPreview: UIViewRepresentable {
 
-    // MARK: - Properties
-
-    /// The capture session to display
+    private static let logger = Logger(subsystem: "com.agcamera", category: "CameraPreview")
     let session: AVCaptureSession
-
-    /// Video gravity (aspect fill, aspect fit, resize)
     let videoGravity: AVLayerVideoGravity
-
-    /// Current camera position (to control mirroring)
     let cameraPosition: AVCaptureDevice.Position
-
-    // MARK: - Initialization
 
     public init(
         session: AVCaptureSession,
@@ -34,8 +26,6 @@ public struct AGCameraPreview: UIViewRepresentable {
         self.videoGravity = videoGravity
         self.cameraPosition = cameraPosition
     }
-
-    // MARK: - UIViewRepresentable
 
     public func makeUIView(context: Context) -> PreviewView {
         let view = PreviewView()
@@ -83,22 +73,19 @@ public struct AGCameraPreview: UIViewRepresentable {
 
         connection.videoRotationAngle = angle
 
-        // DON'T mirror preview - show as others see you (not like a mirror)
         if connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
-            connection.isVideoMirrored = false  // Never mirror, even for front camera
-            print("🖼️ Preview mirroring: \(connection.isVideoMirrored) (camera: \(cameraPosition == .front ? "front" : "back"))")
+            connection.isVideoMirrored = false
+            Self.logger.debug("Preview mirroring: \(connection.isVideoMirrored) (camera: \(cameraPosition == .front ? "front" : "back"))")
         }
     }
 
-    // MARK: - Preview View
-
-    /// Custom UIView that hosts the AVCaptureVideoPreviewLayer
     public class PreviewView: UIView {
-
-        /// The preview layer
         public var previewLayer: AVCaptureVideoPreviewLayer {
-            return layer as! AVCaptureVideoPreviewLayer
+            guard let previewLayer = layer as? AVCaptureVideoPreviewLayer else {
+                fatalError("Expected AVCaptureVideoPreviewLayer but got \(type(of: layer))")
+            }
+            return previewLayer
         }
 
         override public class var layerClass: AnyClass {
