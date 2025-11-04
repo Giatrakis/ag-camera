@@ -22,6 +22,7 @@ public class AGCameraManager: NSObject {
     public private(set) var isRecording = false
     public private(set) var recordingDuration: TimeInterval = 0.0
     public private(set) var currentZoomFactor: CGFloat = 1.0
+    public private(set) var lastZoomFactor: CGFloat = 1.0
 
     private let sessionManager: AGSessionManager
     private let captureManager: AGCaptureManager
@@ -70,6 +71,7 @@ extension AGCameraManager {
             try await sessionManager.setupSession(for: currentCameraPosition)
             deviceControl.configureVideoMirroring(for: currentCameraPosition)
             currentZoomFactor = zoomManager.getCurrentZoomFactor()
+            lastZoomFactor = currentZoomFactor
             self.error = nil
         } catch {
             self.error = error as? CameraError ?? .setupFailed
@@ -137,7 +139,9 @@ extension AGCameraManager {
         deviceControl.configureVideoMirroring(for: newPosition)
 
         currentCameraPosition = newPosition
-        currentZoomFactor = zoomManager.getCurrentZoomFactor()
+        currentZoomFactor = 1.0
+        lastZoomFactor = 1.0
+        try? zoomManager.setZoom(factor: 1.0)
     }
 
     public func setFlashMode(_ mode: AVCaptureDevice.FlashMode) {
@@ -210,6 +214,20 @@ extension AGCameraManager {
 
     public func setZoom(factor: CGFloat) throws {
         currentZoomFactor = try zoomManager.setZoom(factor: factor)
+        lastZoomFactor = currentZoomFactor
+    }
+
+    public func updateZoomInteractively(scale: CGFloat, isGestureEnded: Bool) throws {
+        let newZoom = lastZoomFactor * scale
+        let maxZoom = maxZoomFactor
+        let minZoom = minZoomFactor
+        let clampedZoom = min(max(newZoom, minZoom), maxZoom)
+
+        currentZoomFactor = try zoomManager.setZoom(factor: clampedZoom)
+
+        if isGestureEnded {
+            lastZoomFactor = currentZoomFactor
+        }
     }
 
     public var maxZoomFactor: CGFloat {
@@ -218,6 +236,32 @@ extension AGCameraManager {
 
     public var minZoomFactor: CGFloat {
         zoomManager.getMinZoomFactor()
+    }
+
+    public var availableZoomLevels: [CGFloat] {
+        let minZoom = minZoomFactor
+        let maxZoom = maxZoomFactor
+        var levels: [CGFloat] = []
+
+        if minZoom <= 0.5 && maxZoom >= 0.5 && currentCameraPosition == .back {
+            levels.append(0.5)
+        }
+
+        levels.append(1.0)
+
+        if maxZoom >= 2.0 {
+            levels.append(2.0)
+        }
+
+        if maxZoom >= 3.0 {
+            levels.append(3.0)
+        }
+
+        if maxZoom >= 5.0 {
+            levels.append(5.0)
+        }
+
+        return levels
     }
 }
 
@@ -260,6 +304,30 @@ extension AGCameraManager {
 
     public func saveVideoToLibrary(url: URL) async throws {
         try await mediaLibrary.saveVideoToLibrary(url: url)
+    }
+}
+
+// MARK: - Presentation
+
+extension AGCameraManager {
+
+    public var flashIconName: String {
+        switch flashMode {
+        case .off:
+            return "bolt.slash"
+        case .on:
+            return "bolt.fill"
+        case .auto:
+            return "bolt.badge.automatic"
+        @unknown default:
+            return "bolt.slash"
+        }
+    }
+
+    public var formattedRecordingDuration: String {
+        let minutes = Int(recordingDuration) / 60
+        let seconds = Int(recordingDuration) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 }
 
