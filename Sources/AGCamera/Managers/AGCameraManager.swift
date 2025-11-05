@@ -81,6 +81,12 @@ public class AGCameraManager: NSObject {
 extension AGCameraManager {
 
     public func setupSession() async throws {
+        // Prevent duplicate setup by checking if session already has video input
+        guard sessionManager.videoDeviceInput == nil else {
+            Self.logger.info("Session already configured, skipping setup")
+            return
+        }
+
         if configuration.handlePermissions {
             guard permissionManager.isCameraAuthorized else {
                 let error = CameraError.permissionDenied
