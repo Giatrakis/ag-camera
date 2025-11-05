@@ -10,14 +10,14 @@ import AVFoundation
 import UIKit
 import OSLog
 
-public struct AGCameraPreview: UIViewRepresentable {
+struct AGCameraPreview: UIViewRepresentable {
 
     private static let logger = Logger(subsystem: "com.agcamera", category: "CameraPreview")
     let session: AVCaptureSession
     let videoGravity: AVLayerVideoGravity
     let cameraPosition: AVCaptureDevice.Position
 
-    public init(
+    init(
         session: AVCaptureSession,
         videoGravity: AVLayerVideoGravity,
         cameraPosition: AVCaptureDevice.Position
@@ -27,7 +27,7 @@ public struct AGCameraPreview: UIViewRepresentable {
         self.cameraPosition = cameraPosition
     }
 
-    public func makeUIView(context: Context) -> PreviewView {
+    func makeUIView(context: Context) -> PreviewView {
         let view = PreviewView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = videoGravity
@@ -46,7 +46,7 @@ public struct AGCameraPreview: UIViewRepresentable {
         return view
     }
 
-    public func updateUIView(_ uiView: PreviewView, context: Context) {
+    func updateUIView(_ uiView: PreviewView, context: Context) {
         uiView.previewLayer.session = session
         uiView.previewLayer.videoGravity = videoGravity
         updateOrientation(for: uiView)
@@ -80,15 +80,15 @@ public struct AGCameraPreview: UIViewRepresentable {
         }
     }
 
-    public class PreviewView: UIView {
-        public var previewLayer: AVCaptureVideoPreviewLayer {
+    class PreviewView: UIView {
+        var previewLayer: AVCaptureVideoPreviewLayer {
             guard let previewLayer = layer as? AVCaptureVideoPreviewLayer else {
                 fatalError("Expected AVCaptureVideoPreviewLayer but got \(type(of: layer))")
             }
             return previewLayer
         }
 
-        override public class var layerClass: AnyClass {
+        override class var layerClass: AnyClass {
             return AVCaptureVideoPreviewLayer.self
         }
 
@@ -106,7 +106,7 @@ public struct AGCameraPreview: UIViewRepresentable {
             backgroundColor = .black
         }
 
-        override public func layoutSubviews() {
+        override func layoutSubviews() {
             super.layoutSubviews()
             previewLayer.frame = bounds
         }

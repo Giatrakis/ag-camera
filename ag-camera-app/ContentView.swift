@@ -7,12 +7,13 @@
 
 import SwiftUI
 import AGCamera
+internal import AVFoundation
 
 struct ContentView: View {
     @State private var cameraManager = AGCameraManager()
     
     var body: some View {
-        AGCameraView(manager: cameraManager) { image in
+        AGCameraView(manager: cameraManager, configuration: AGCameraConfiguration(videoGravity: .resizeAspect)) { image in
             
         } onVideoRecordingStopped: { url in
             
