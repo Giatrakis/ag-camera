@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "AGCamera",
+    name: "ag-camera",
     platforms: [
         .iOS(.v18)
     ],

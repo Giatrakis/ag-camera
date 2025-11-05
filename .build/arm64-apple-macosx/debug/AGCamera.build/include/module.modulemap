@@ -1,3 +1,0 @@
-module AGCamera {
-    header "/Users/alex/Desktop/Projects/ag-camera/.build/arm64-apple-macosx/debug/AGCamera.build/include/AGCamera-Swift.h"
-}

@@ -13,7 +13,7 @@ struct ContentView: View {
     @State private var cameraManager = AGCameraManager()
     
     var body: some View {
-        AGCameraView(manager: cameraManager, configuration: AGCameraConfiguration(videoGravity: .resizeAspect)) { image in
+        AGCameraView(manager: cameraManager, configuration: AGCameraConfiguration(videoGravity: .resizeAspectFill)) { image in
             
         } onVideoRecordingStopped: { url in
             

@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		FA89B3842EBAB94E00B6DD3F /* AGCamera in Frameworks */ = {isa = PBXBuildFile; productRef = FA89B3832EBAB94E00B6DD3F /* AGCamera */; };
 		FAD35EF92EB4E2F0004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
 		FAD35F1F2EB4E99B004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
 		FAD35F202EB4E99B004AF78D /* ag_camera.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -51,14 +50,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		FAD35EEF2EB4E2F0004AF78D /* ag-camera */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "ag-camera";
-			sourceTree = "<group>";
-		};
 		FAD35F142EB4E8E9004AF78D /* ag-camera-app */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "ag-camera-app";
+			sourceTree = "<group>";
+		};
+		FAE0B3D52EBADCB000021FC6 /* Sources */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Sources;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -84,7 +83,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				FAD35F1F2EB4E99B004AF78D /* ag_camera.framework in Frameworks */,
-				FA89B3842EBAB94E00B6DD3F /* AGCamera in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,7 +92,7 @@
 		FAD35EE32EB4E2F0004AF78D = {
 			isa = PBXGroup;
 			children = (
-				FAD35EEF2EB4E2F0004AF78D /* ag-camera */,
+				FAE0B3D52EBADCB000021FC6 /* Sources */,
 				FAD35F142EB4E8E9004AF78D /* ag-camera-app */,
 				FAD35EEE2EB4E2F0004AF78D /* Products */,
 			);
@@ -127,6 +125,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = FAD35F012EB4E2F0004AF78D /* Build configuration list for PBXNativeTarget "ag-camera" */;
 			buildPhases = (
+				D0180C4ACD2842B490A389E6 /* Build Target Dependencies */,
 				FAD35EE82EB4E2F0004AF78D /* Headers */,
 				FAD35EE92EB4E2F0004AF78D /* Sources */,
 				FAD35EEA2EB4E2F0004AF78D /* Frameworks */,
@@ -137,7 +136,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				FAD35EEF2EB4E2F0004AF78D /* ag-camera */,
+				FAE0B3D52EBADCB000021FC6 /* Sources */,
 			);
 			name = "ag-camera";
 			packageProductDependencies = (
@@ -185,7 +184,6 @@
 			);
 			name = "ag-camera-app";
 			packageProductDependencies = (
-				FA89B3832EBAB94E00B6DD3F /* AGCamera */,
 			);
 			productName = "ag-camera-app";
 			productReference = FAD35F132EB4E8E9004AF78D /* ag-camera-app.app */;
@@ -222,7 +220,6 @@
 			mainGroup = FAD35EE32EB4E2F0004AF78D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				FA89B3822EBAB94E00B6DD3F /* XCLocalSwiftPackageReference "../ag-camera" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = FAD35EEE2EB4E2F0004AF78D /* Products */;
@@ -259,6 +256,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		D0180C4ACD2842B490A389E6 /* Build Target Dependencies */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			alwaysOutOfDate = 1;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Target Dependencies";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			shellPath = /bin/sh;
+			showEnvVarsInLog = 0;			
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		FAD35EE92EB4E2F0004AF78D /* Sources */ = {
@@ -337,7 +355,7 @@
 				DEVELOPMENT_TEAM = S977N486XJ;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -404,7 +422,7 @@
 				DEVELOPMENT_TEAM = S977N486XJ;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -645,20 +663,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		FA89B3822EBAB94E00B6DD3F /* XCLocalSwiftPackageReference "../ag-camera" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "../ag-camera";
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		FA89B3832EBAB94E00B6DD3F /* AGCamera */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = AGCamera;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FAD35EE42EB4E2F0004AF78D /* Project object */;
 }
