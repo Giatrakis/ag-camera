@@ -107,8 +107,11 @@ extension AGCameraManager {
         do {
             try await sessionManager.setupSession(for: currentCameraPosition)
             deviceControl.configureVideoMirroring(for: currentCameraPosition)
-            currentZoomFactor = zoomManager.getCurrentZoomFactor()
-            lastZoomFactor = currentZoomFactor
+
+            try? zoomManager.setZoom(factor: configuration.defaultZoomScale)
+            currentZoomFactor = configuration.defaultZoomScale
+            lastZoomFactor = configuration.defaultZoomScale
+
             self.error = nil
         } catch {
             self.error = error as? CameraError ?? .setupFailed
@@ -207,9 +210,9 @@ extension AGCameraManager {
         deviceControl.configureVideoMirroring(for: newPosition)
 
         currentCameraPosition = newPosition
-        currentZoomFactor = 1.0
-        lastZoomFactor = 1.0
-        try? zoomManager.setZoom(factor: 1.0)
+        currentZoomFactor = configuration.defaultZoomScale
+        lastZoomFactor = configuration.defaultZoomScale
+        try? zoomManager.setZoom(factor: configuration.defaultZoomScale)
 
         if animated {
             // Small delay before removing blur

@@ -8,6 +8,7 @@ public struct AGCameraConfiguration {
     public var focusIndicator: AnyView
     public var defaultCameraPosition: AVCaptureDevice.Position
     public var defaultFlashMode: AVCaptureDevice.FlashMode
+    public var defaultZoomScale: CGFloat
 
     public init(
         handlePermissions: Bool = true,
@@ -15,7 +16,8 @@ public struct AGCameraConfiguration {
         videoGravity: AVLayerVideoGravity = .resizeAspectFill,
         focusIndicator: some View = AGFocusIndicatorView(),
         defaultCameraPosition: AVCaptureDevice.Position = .back,
-        defaultFlashMode: AVCaptureDevice.FlashMode = .off
+        defaultFlashMode: AVCaptureDevice.FlashMode = .off,
+        defaultZoomScale: CGFloat = 1.0
     ) {
         self.handlePermissions = handlePermissions
         self.showDefaultControls = showDefaultControls
@@ -23,6 +25,7 @@ public struct AGCameraConfiguration {
         self.focusIndicator = AnyView(focusIndicator)
         self.defaultCameraPosition = defaultCameraPosition
         self.defaultFlashMode = defaultFlashMode
+        self.defaultZoomScale = defaultZoomScale
     }
 
     public static let `default` = AGCameraConfiguration()

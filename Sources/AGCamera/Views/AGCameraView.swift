@@ -269,6 +269,7 @@ private extension AGCameraView {
     AGCameraView(manager: cameraManager)
         .defaultCameraPosition(.back)
         .defaultFlashMode(.auto)
+        .defaultZoomScale(2.0)
         .showDefaultControls(true)
         .handlePermissions(true)
         .onPhotoCapture { image in

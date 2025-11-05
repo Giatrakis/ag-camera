@@ -89,6 +89,12 @@ extension AGCameraView {
         return self
     }
 
+    /// Set default zoom scale
+    public func defaultZoomScale(_ scale: CGFloat) -> Self {
+        manager.configuration.defaultZoomScale = scale
+        return self
+    }
+
     /// Customize the focus indicator view
     public func focusIndicator<V: View>(_ indicator: V) -> Self {
         manager.configuration.focusIndicator = AnyView(indicator)

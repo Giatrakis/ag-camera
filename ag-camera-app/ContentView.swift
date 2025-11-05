@@ -15,6 +15,7 @@ struct ContentView: View {
     var body: some View {
         AGCameraView(manager: cameraManager)
             .videoGravity(.resizeAspectFill)
+            .defaultZoomScale(1)
             .onPhotoCapture { image in
                 print("IMAGE: \(image)")
             }
