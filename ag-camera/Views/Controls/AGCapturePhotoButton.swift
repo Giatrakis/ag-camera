@@ -19,13 +19,12 @@ public struct AGCapturePhotoButton: View {
         } label: {
             ZStack {
                 Circle()
-                    .foregroundStyle(.gray)
-                    .frame(width: 85, height: 85)
-                    .opacity(0.6)
+                    .frame(width: 80, height: 80)
+                    .glassEffect(.regular.tint(.gray.opacity(0.3)), in: Circle())
                 
                 Circle()
                     .foregroundStyle(.white)
-                    .frame(width: 75, height: 75)
+                    .frame(width: 70, height: 70)
                     .scaleEffect(animate ? 0.9 : 1.0)
                     .animation(.spring(response: 0.3), value: animate)
             }

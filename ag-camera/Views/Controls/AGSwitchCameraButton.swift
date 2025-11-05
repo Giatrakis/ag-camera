@@ -19,12 +19,11 @@ public struct AGSwitchCameraButton: View {
         } label: {
             Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
                 .font(.title2)
-                .padding(10)
+                .padding(12)
                 .foregroundStyle(.white)
-                .background(animate ? Color.gray.opacity(0.3) : .white.opacity(0.3))
-                .clipShape(Circle())
-                .scaleEffect(animate ? 1.2 : 1.0)
-                .animation(.bouncy(duration: 0.3, extraBounce: 0.3), value: animate)
         }
+        .glassEffect(.regular.tint(.gray.opacity(0.3)), in: Circle())
+        .scaleEffect(animate ? 1.15 : 1.0)
+        .animation(.bouncy(duration: 0.3, extraBounce: 0.3), value: animate)
     }
 }

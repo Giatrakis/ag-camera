@@ -26,10 +26,6 @@ public struct AGCameraView: View {
 
     @Environment(\.scenePhase) private var scenePhase
 
-    private var controlsOpacity: Double {
-        manager.currentZoomFactor >= 3.0 ? 0.3 : 1.0
-    }
-
     public init(
         manager: AGCameraManager,
         configuration: AGCameraConfiguration = .default,
@@ -89,32 +85,13 @@ public struct AGCameraView: View {
             
             if configuration.showDefaultControls {
                 VStack {
-                    topBar
-                        .padding()
-                        .opacity(controlsOpacity)
-                        .animation(.easeInOut(duration: 0.3), value: controlsOpacity)
-
+                    topControlsView
                     Spacer()
-
-                    if manager.isRecording {
-                        recordingTimer
-                            .padding(.top, 20)
-                    }
-
-//                    zoomIndicator
-//                        .padding(.bottom, 10)
-
-                    AGSZoomControlView(manager: manager) { newZoomLevel in
-                        setZoom(to: newZoomLevel)
-                    }
-
-                    bottomBar
-                        .padding()
-                        .opacity(controlsOpacity)
-                        .animation(.easeInOut(duration: 0.3), value: controlsOpacity)
+                    bottomControlsView
                 }
             }
         }
+        .ignoresSafeArea(edges: .bottom)
         .task {
             if configuration.handlePermissions {
                 let result = await manager.permissionManager.requestAllPermissions()
@@ -142,7 +119,7 @@ public struct AGCameraView: View {
         }
     }
     
-    private var topBar: some View {
+    private var topControlsView: some View {
         HStack {
             Button(action: {
                 manager.toggleFlash()
@@ -155,7 +132,13 @@ public struct AGCameraView: View {
                     .background(Circle().fill(Color.black.opacity(0.5)))
             }
 
-            Spacer()
+            if manager.isRecording {
+                AGVideoDurationView(duration: manager.formattedRecordingDuration)
+                    .frame(maxWidth: .infinity)
+                    .transition(.opacity)
+            } else {
+                Spacer()
+            }
 
             Button(action: {
                 try? manager.setSessionPreset(.hd4K3840x2160)
@@ -167,10 +150,15 @@ public struct AGCameraView: View {
                     .background(Circle().fill(Color.black.opacity(0.5)))
             }
         }
+        .padding()
     }
     
-    private var bottomBar: some View {
-        VStack {
+    private var bottomControlsView: some View {
+        VStack(spacing: 30) {
+            AGSZoomControlView(manager: manager) { newZoomLevel in
+                setZoom(to: newZoomLevel)
+            }
+            
             switch outputType {
             case .photo:
                 AGCapturePhotoButton {
@@ -182,46 +170,17 @@ public struct AGCameraView: View {
                 }
             }
             
-            HStack(spacing: 40) {
+            HStack(spacing: 30) {
                 Circle()
-                    .frame(width: 70, height: 70)
+                    .frame(width: 50, height: 50)
                 AGInputPickerButton(outputType: $outputType)
                 AGSwitchCameraButton {
                     await switchCamera()
                 }
             }
-            .padding(.horizontal)
         }
-    }
-
-    private var zoomIndicator: some View {
-        Text(String(format: "%.1f×", manager.currentZoomFactor))
-            .font(.headline)
-            .foregroundColor(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(Color.black.opacity(0.6))
-            )
-    }
-
-    private var recordingTimer: some View {
-        HStack(spacing: 8) {
-            RecordingDot()
-
-            Text(manager.formattedRecordingDuration)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-                .monospacedDigit()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            Capsule()
-                .fill(Color.black.opacity(0.7))
-        )
+        .padding(.horizontal)
+        .padding(.bottom, 30)
     }
 
     private func setupCamera() async {
@@ -345,123 +304,7 @@ public struct AGCameraView: View {
     }
 }
 
-private struct ImagePreviewView: View {
-    let image: UIImage
-    let onDismiss: () -> Void
-    
-    var body: some View {
-        NavigationView {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .navigationTitle("Preview")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") {
-                            onDismiss()
-                        }
-                    }
-                }
-        }
-    }
-}
-
-public struct FocusIndicatorView: View {
-    @State private var animate = false
-    
-    public init() {}
-
-    public var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .stroke(Color.yellow, lineWidth: 2)
-            .frame(width: 80, height: 80)
-            .scaleEffect(animate ? 1.0 : 0.8)
-            .opacity(animate ? 1.0 : 0.8)
-            .onAppear {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    animate = true
-                }
-            }
-    }
-}
-
-private struct RecordingDot: View {
-    @State private var isPulsing = false
-
-    var body: some View {
-        Circle()
-            .fill(Color.red)
-            .frame(width: 12, height: 12)
-            .opacity(isPulsing ? 0.3 : 1.0)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                    isPulsing = true
-                }
-            }
-    }
-}
-
 #Preview {
     @Previewable let cameraManager = AGCameraManager()
     AGCameraView(manager: cameraManager)
-}
-
-
-public struct AGSZoomControlView: View {
-    @Bindable var manager: AGCameraManager
-    var onZoomChange: (CGFloat) -> Void
-    @State private var animate = false
-    
-    private var zoomLevels: [CGFloat] {
-        Array(manager.availableZoomLevels.prefix(3))
-    }
-    
-    public var body: some View {
-        HStack(spacing: 0) {
-            ForEach(zoomLevels, id: \.self) { level in
-                ZoomButton(level: level, currentZoom: manager.currentZoomFactor) { zoom in
-                    onZoomChange(zoom)
-                }
-            }
-        }
-    }
-    
-    private struct ZoomButton: View {
-        var level: CGFloat
-        var currentZoom: CGFloat
-        var action: (CGFloat) -> Void
-        @State private var animate = false
-        
-        private var isSelected: Bool {
-            level == currentZoom 
-        }
-        
-        private var selectedSuffix: String {
-            isSelected ? "×" : ""
-        }
-        
-        var body: some View {
-            Button {
-                action(level)
-                animate = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { animate = false }
-            } label: {
-                    Text(level.truncatingRemainder(dividingBy: 1) == 0 ?
-                         String(format: "%.0f\(selectedSuffix)", level) :
-                            String(format: "%.1f\(selectedSuffix)", level))
-                    .monospaced()
-                    .font(.system(size: 13))
-                    .fontWeight(.medium)
-                    .foregroundStyle(isSelected ? .yellow : .white)
-                    .shadow(color: .black, radius: isSelected ? 0 : 2, x: 0, y: 0)
-                    .frame(width: 38, height: 38)
-                    .background(isSelected ? Color.black.opacity(0.4) : .white.opacity(0.001))
-                    .clipShape(Circle())
-                    .scaleEffect(animate ? 0.9 : 1.0)
-                    .animation(.bouncy(duration: 0.3, extraBounce: 0.3), value: animate)
-            }
-            .buttonStyle(.plain)
-        }
-    }
 }

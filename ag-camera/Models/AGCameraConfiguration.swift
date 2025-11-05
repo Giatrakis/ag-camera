@@ -13,7 +13,7 @@ public struct AGCameraConfiguration {
         handlePermissions: Bool = true,
         showDefaultControls: Bool = true,
         videoGravity: AVLayerVideoGravity = .resizeAspectFill,
-        focusIndicator: some View = FocusIndicatorView(),
+        focusIndicator: some View = AGFocusIndicatorView(),
         defaultCameraPosition: AVCaptureDevice.Position = .back,
         defaultFlashMode: AVCaptureDevice.FlashMode = .off
     ) {

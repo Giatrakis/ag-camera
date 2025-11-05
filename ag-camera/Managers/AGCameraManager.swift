@@ -57,8 +57,10 @@ public class AGCameraManager: NSObject {
         captureManager.onRecordingStateChanged = { [weak self] isRecording, duration in
             guard let self = self else { return }
             Task { @MainActor in
-                self.isRecording = isRecording
-                self.recordingDuration = duration
+                withAnimation {
+                    self.isRecording = isRecording
+                    self.recordingDuration = duration
+                }
             }
         }
     }
@@ -336,9 +338,11 @@ extension AGCameraManager {
     }
 
     public var formattedRecordingDuration: String {
-        let minutes = Int(recordingDuration) / 60
-        let seconds = Int(recordingDuration) % 60
-        return String(format: "%02d:%02d", minutes, seconds)
+        let totalSeconds = Int(recordingDuration)
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 }
 
