@@ -12,15 +12,26 @@ public struct AGInputPickerButton: View {
     @State private var animate = false
     
     public var body: some View {
-        Picker("", selection: $outputType) {
-            ForEach(AGOutputType.allCases) { type in
-                Text(type.title.uppercased())
-                    .foregroundStyle(type == outputType ? .yellow : .white)
-            }
+        if #available(iOS 26.0, *) {
+            Picker("", selection: $outputType) { typesView }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .controlSize(.large)
+                .glassEffect()
+        } else {
+            Picker("", selection: $outputType) { typesView }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .controlSize(.large)
+                .glassEffect()
         }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .controlSize(.large)
-        .glassEffect()
+        
+    }
+    
+    private var typesView: some View {
+        ForEach(AGOutputType.allCases) { type in
+            Text(type.title.uppercased())
+                .foregroundStyle(type == outputType ? .yellow : .white)
+        }
     }
 }

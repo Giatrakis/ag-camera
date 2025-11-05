@@ -19,9 +19,15 @@ public struct AGCaptureVideoButton: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { animate = false }
         } label: {
             ZStack {
-                Circle()
-                    .frame(width: 80, height: 80)
-                    .glassEffect(.regular.tint(.gray.opacity(0.3)), in: Circle())
+                if #available(iOS 26.0, *) {
+                    Circle()
+                        .frame(width: 80, height: 80)
+                        .glassEffect(.regular.tint(.gray.opacity(0.3)), in: Circle())
+                } else {
+                    Circle()
+                        .frame(width: 80, height: 80)
+                        .foregroundStyle(.gray.opacity(0.3))
+                }
                 
                 RoundedRectangle(cornerRadius: isRecording ? 6 : 35)
                     .frame(width: isRecording ? 36 : 70, height: isRecording ? 36 : 70)
