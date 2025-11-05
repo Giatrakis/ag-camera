@@ -31,31 +31,23 @@ struct AGCameraPreview: UIViewRepresentable {
         let view = PreviewView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = videoGravity
-        updateOrientation(for: view)
-
-        // Observe orientation changes
-        NotificationCenter.default.addObserver(
-            forName: UIDevice.orientationDidChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak view] _ in
+        view.orientationUpdateHandler = { [weak view] orientation in
             guard let view = view else { return }
-            self.updateOrientation(for: view)
+            self.updateOrientation(for: view, orientation: orientation)
         }
-
+        updateOrientation(for: view, orientation: UIDevice.current.orientation)
         return view
     }
 
     func updateUIView(_ uiView: PreviewView, context: Context) {
         uiView.previewLayer.session = session
         uiView.previewLayer.videoGravity = videoGravity
-        updateOrientation(for: uiView)
+        updateOrientation(for: uiView, orientation: UIDevice.current.orientation)
     }
 
-    private func updateOrientation(for view: PreviewView) {
+    private func updateOrientation(for view: PreviewView, orientation: UIDeviceOrientation) {
         guard let connection = view.previewLayer.connection else { return }
 
-        let orientation = UIDevice.current.orientation
         let angle: CGFloat
 
         switch orientation {
@@ -81,9 +73,14 @@ struct AGCameraPreview: UIViewRepresentable {
     }
 
     class PreviewView: UIView {
+        var orientationUpdateHandler: ((UIDeviceOrientation) -> Void)?
+
         var previewLayer: AVCaptureVideoPreviewLayer {
             guard let previewLayer = layer as? AVCaptureVideoPreviewLayer else {
-                fatalError("Expected AVCaptureVideoPreviewLayer but got \(type(of: layer))")
+                AGCameraPreview.logger.error("Layer is not AVCaptureVideoPreviewLayer, got \(String(describing: type(of: self.layer)))")
+                let fallbackLayer = AVCaptureVideoPreviewLayer()
+                fallbackLayer.frame = bounds
+                return fallbackLayer
             }
             return previewLayer
         }
@@ -109,6 +106,11 @@ struct AGCameraPreview: UIViewRepresentable {
         override func layoutSubviews() {
             super.layoutSubviews()
             previewLayer.frame = bounds
+        }
+
+        override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+            orientationUpdateHandler?(UIDevice.current.orientation)
         }
     }
 }

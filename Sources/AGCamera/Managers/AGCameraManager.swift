@@ -408,7 +408,7 @@ extension AGCameraManager {
 
 // MARK: - Camera Errors
 
-public enum CameraError: LocalizedError {
+public enum CameraError: LocalizedError, Sendable {
     case permissionDenied
     case cameraNotAvailable
     case setupFailed

@@ -24,7 +24,7 @@ class AGCaptureManager: NSObject {
     private(set) var isRecording = false
     private(set) var recordingDuration: TimeInterval = 0.0
 
-    private var recordingTimer: Timer?
+    private var recordingTimerTask: Task<Void, Never>?
     private var recordingStartTime: Date?
 
     var onRecordingStateChanged: ((Bool, TimeInterval) -> Void)?
@@ -157,6 +157,16 @@ class AGCaptureManager: NSObject {
         recordingDuration = Date().timeIntervalSince(startTime)
         onRecordingStateChanged?(isRecording, recordingDuration)
     }
+
+    private func startRecordingDurationTracking() {
+        recordingTimerTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled else { break }
+                updateRecordingDuration()
+            }
+        }
+    }
 }
 
 extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
@@ -196,13 +206,10 @@ extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
             self.recordingStartTime = Date()
             self.recordingDuration = 0.0
 
-            self.recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                self?.updateRecordingDuration()
-            }
+            self.startRecordingDurationTracking()
 
             Self.logger.info("Recording started at: \(fileURL)")
 
-            // Notify that recording started successfully
             self.videoRecordingStartCompletion?(.success(fileURL))
             self.videoRecordingStartCompletion = nil
         }
@@ -215,8 +222,8 @@ extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
         error: Error?
     ) {
         Task { @MainActor in
-            self.recordingTimer?.invalidate()
-            self.recordingTimer = nil
+            self.recordingTimerTask?.cancel()
+            self.recordingTimerTask = nil
             self.recordingStartTime = nil
 
             let finalDuration = self.recordingDuration
@@ -226,7 +233,6 @@ extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
 
             Self.logger.info("Recording stopped. Duration was: \(String(format: "%.1f", finalDuration))s")
 
-            // Notify that recording stopped with final URL
             if let error = error {
                 self.videoRecordingStopCompletion?(.failure(error))
             } else {

@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct AGPermissionsResult {
+public struct AGPermissionsResult: Sendable {
     public let camera: Bool
     public let microphone: Bool
     public let photoLibrary: Bool
