@@ -30,6 +30,10 @@ public class AGCameraManager: NSObject {
     public var lastVideoURL: URL?
     public var lastCapturedPhotoData: Data?
 
+    // Camera switch animation state
+    public var isBlurred: Bool = false
+    public var flipRotation: Double = 0
+
     private let sessionManager: AGSessionManager
     private let captureManager: AGCaptureManager
     private let deviceControl: AGDeviceControlManager
@@ -163,7 +167,25 @@ extension AGCameraManager {
 
 extension AGCameraManager {
 
-    public func switchCamera() async throws {
+    public func switchCamera(animated: Bool = true) async throws {
+        if animated {
+            let flipDirection: Double = currentCameraPosition == .back ? 180 : -180
+
+            // Start blur animation
+            withAnimation(.easeOut(duration: 0.1)) {
+                isBlurred = true
+            }
+
+            // Start flip animation
+            withAnimation(.easeInOut(duration: 0.5)) {
+                flipRotation += flipDirection
+            }
+
+            // Wait for half the flip animation before switching
+            try await Task.sleep(nanoseconds: 250_000_000)
+        }
+
+        // Perform the actual camera switch
         let newPosition: AVCaptureDevice.Position = (currentCameraPosition == .back) ? .front : .back
 
         try await sessionManager.switchCamera(to: newPosition)
@@ -173,6 +195,16 @@ extension AGCameraManager {
         currentZoomFactor = 1.0
         lastZoomFactor = 1.0
         try? zoomManager.setZoom(factor: 1.0)
+
+        if animated {
+            // Small delay before removing blur
+            try await Task.sleep(nanoseconds: 100_000_000)
+
+            // End blur animation
+            withAnimation(.easeIn(duration: 0.15)) {
+                isBlurred = false
+            }
+        }
     }
 
     public func setFlashMode(_ mode: AVCaptureDevice.FlashMode) {

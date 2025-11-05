@@ -19,8 +19,6 @@ public struct AGCameraView: View {
     @State private var focusPoint: CGPoint?
     @State private var showFocusIndicator = false
     @State private var focusTask: Task<Void, Never>?
-    @State private var flipRotation: Double = 0
-    @State private var isBlurred: Bool = false
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -67,9 +65,9 @@ public struct AGCameraView: View {
                             try? manager.updateZoomInteractively(scale: value, isGestureEnded: true)
                         }
                 )
-                .blur(radius: isBlurred ? 20 : 0)
+                .blur(radius: manager.isBlurred ? 20 : 0)
                 .rotation3DEffect(
-                    .degrees(flipRotation),
+                    .degrees(manager.flipRotation),
                     axis: (x: 0, y: 1, z: 0)
                 )
                 .overlay {
@@ -253,26 +251,7 @@ private extension AGCameraView {
     
     private var switchCameraButton: some View {
         AGSwitchCameraButton {
-            let flipDirection: Double = manager.currentCameraPosition == .back ? 180 : -180
-
-            withAnimation(.easeOut(duration: 0.1)) {
-                isBlurred = true
-            }
-
-            withAnimation(.easeInOut(duration: 0.5)) {
-                flipRotation += flipDirection
-            }
-
-            try? await Task.sleep(nanoseconds: 250_000_000)
-
             try? await manager.switchCamera()
-            onCameraPositionChanged?(manager.currentCameraPosition)
-
-            try? await Task.sleep(nanoseconds: 100_000_000)
-
-            withAnimation(.easeIn(duration: 0.15)) {
-                isBlurred = false
-            }
         }
     }
 }

@@ -23,7 +23,6 @@ public struct AGInputPickerButton: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .controlSize(.large)
-                .glassEffect()
         }
         
     }
