@@ -21,11 +21,11 @@ public struct AGCaptureVideoButton: View {
             ZStack {
                 Circle()
                     .foregroundStyle(.gray)
-                    .frame(width: 70, height: 70)
-                    .opacity(0.3)
+                    .frame(width: 85, height: 85)
+                    .opacity(0.6)
                 
-                RoundedRectangle(cornerRadius: isRecording ? 6 : 30)
-                    .frame(width: isRecording ? 30 : 60, height: isRecording ? 30 : 60)
+                RoundedRectangle(cornerRadius: isRecording ? 6 : 37.5)
+                    .frame(width: isRecording ? 36 : 75, height: isRecording ? 36 : 75)
                     .foregroundStyle(.red)
                     .animation(.smooth, value: isRecording)
             }

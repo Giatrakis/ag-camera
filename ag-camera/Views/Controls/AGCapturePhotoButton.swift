@@ -20,12 +20,12 @@ public struct AGCapturePhotoButton: View {
             ZStack {
                 Circle()
                     .foregroundStyle(.gray)
-                    .frame(width: 70, height: 70)
-                    .opacity(0.3)
+                    .frame(width: 85, height: 85)
+                    .opacity(0.6)
                 
                 Circle()
                     .foregroundStyle(.white)
-                    .frame(width: 60, height: 60)
+                    .frame(width: 75, height: 75)
                     .scaleEffect(animate ? 0.9 : 1.0)
                     .animation(.spring(response: 0.3), value: animate)
             }

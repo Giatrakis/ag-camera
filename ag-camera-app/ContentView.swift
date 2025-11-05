@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import AGCamera
+import ag_camera
 internal import AVFoundation
 
 struct ContentView: View {

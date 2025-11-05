@@ -2,6 +2,21 @@ import SwiftUI
 import AVFoundation
 import OSLog
 
+enum OutputType: CaseIterable, Identifiable {
+    case photo, video
+    
+    var id: Self { self }
+    
+    var title: String {
+        switch self {
+        case .photo:
+            "Photo"
+        case .video:
+            "Video"
+        }
+    }
+}
+
 public struct AGCameraView: View {
     private static let logger = Logger(subsystem: "com.agcamera", category: "CameraView")
     @Bindable var manager: AGCameraManager
@@ -22,6 +37,7 @@ public struct AGCameraView: View {
     @State private var focusTask: Task<Void, Never>?
     @State private var flipRotation: Double = 0
     @State private var isBlurred: Bool = false
+    @State private var outputType: OutputType = .photo
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -103,9 +119,9 @@ public struct AGCameraView: View {
                     zoomIndicator
                         .padding(.bottom, 10)
 
-                    zoomButtons
-                        .padding(.bottom, 20)
-                        .id(manager.currentCameraPosition)
+                    AGSZoomControlView(manager: manager) { newZoomLevel in
+                        setZoom(to: newZoomLevel)
+                    }
 
                     bottomBar
                         .padding()
@@ -160,65 +176,27 @@ public struct AGCameraView: View {
     }
     
     private var bottomBar: some View {
-        HStack(spacing: 40) {
-            Button(action: {
-                Task {
-                    await switchCamera()
-                }
-            }) {
-                Image(systemName: "camera.rotate")
-                    .font(.title)
-                    .foregroundColor(.white)
-                    .padding(16)
-                    .background(Circle().fill(Color.black.opacity(0.5)))
-            }
-
-            Button(action: {
-                Task {
+        VStack {
+            switch outputType {
+            case .photo:
+                AGCapturePhotoButton {
                     await capturePhoto()
                 }
-            }) {
-                ZStack {
-                    Circle()
-                        .stroke(Color.white, lineWidth: 4)
-                        .frame(width: 70, height: 70)
-
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 60, height: 60)
-                }
-            }
-
-            Button(action: {
-                Task {
+            case .video:
+                AGCaptureVideoButton(isRecording: manager.isRecording) {
                     await toggleVideoRecording()
                 }
-            }) {
-                ZStack {
-                    Circle()
-                        .fill(manager.isRecording ? Color.red : Color.white.opacity(0.8))
-                        .frame(width: 50, height: 50)
-
-                    if manager.isRecording {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white)
-                            .frame(width: 20, height: 20)
-                    }
+            }
+            
+            HStack(spacing: 40) {
+                Circle()
+                    .frame(width: 70, height: 70)
+                AGInputPickerButton(outputType: $outputType)
+                AGSwitchCameraButton {
+                    await switchCamera()
                 }
             }
-        }
-    }
-    
-    private var zoomButtons: some View {
-        HStack(spacing: 15) {
-            let availableLevels = manager.availableZoomLevels
-            let currentZoom = manager.currentZoomFactor
-
-            ForEach(availableLevels, id: \.self) { level in
-                ZoomButton(level: level, currentZoom: currentZoom) {
-                    setZoom(to: level)
-                }
-            }
+            .padding(.horizontal)
         }
     }
 
@@ -395,42 +373,6 @@ private struct ImagePreviewView: View {
     }
 }
 
-private struct ZoomButton: View {
-    let level: CGFloat
-    let currentZoom: CGFloat
-    let action: () -> Void
-    
-    private var isActive: Bool {
-        abs(currentZoom - level) < 0.1
-    }
-    
-    private var displayText: String {
-        if level < 1.0 {
-            return "\(level)×"
-        } else {
-            return "\(Int(level))×"
-        }
-    }
-    
-    var body: some View {
-        Button(action: action) {
-            Text(displayText)
-                .font(.body)
-                .fontWeight(isActive ? .semibold : .regular)
-                .foregroundColor(isActive ? .black : .white)
-                .frame(width: 44, height: 32)
-                .background(
-                    Capsule()
-                        .fill(isActive ? Color.yellow : Color.clear)
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(isActive ? Color.clear : Color.white.opacity(0.3), lineWidth: 1)
-                )
-        }
-    }
-}
-
 public struct FocusIndicatorView: View {
     @State private var animate = false
     
@@ -467,6 +409,66 @@ private struct RecordingDot: View {
 }
 
 #Preview {
-    let cameraManager = AGCameraManager()
-    return AGCameraView(manager: cameraManager)
+    @Previewable let cameraManager = AGCameraManager()
+    AGCameraView(manager: cameraManager)
+}
+
+
+public struct AGSZoomControlView: View {
+    @Bindable var manager: AGCameraManager
+    var onZoomChange: (CGFloat) -> Void
+    @State private var animate = false
+    
+    private var zoomLevels: [CGFloat] {
+        Array(manager.availableZoomLevels.prefix(3))
+    }
+    
+    public var body: some View {
+        HStack(spacing: 15) {
+            ForEach(zoomLevels, id: \.self) { level in
+                ZoomButton(level: level, currentZoom: manager.currentZoomFactor) { zoom in
+                    onZoomChange(zoom)
+                }
+            }
+        }
+    }
+    
+    private struct ZoomButton: View {
+        var level: CGFloat
+        var currentZoom: CGFloat
+        var action: (CGFloat) -> Void
+        @State private var animate = false
+        
+        private var isSelected: Bool {
+            level == currentZoom
+        }
+        
+        private var selectedSuffix: String {
+            isSelected ? "×" : ""
+        }
+        
+        var body: some View {
+            Button {
+                action(level)
+                animate = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { animate = false }
+            } label: {
+                    Text(level.truncatingRemainder(dividingBy: 1) == 0 ?
+                         String(format: "%.0f\(selectedSuffix)", level) :
+                            String(format: "%.1f\(selectedSuffix)", level))
+                    .monospaced()
+                    .monospacedDigit()
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(isSelected ? .yellow : .white)
+                    .shadow(color: .black, radius: isSelected ? 0 : 2, x: 0, y: 0)
+                    .frame(width: 33, height: 33)
+                    .background(isSelected ? Color.black.opacity(0.4) : .clear)
+                    .clipShape(Circle())
+                    .scaleEffect(animate ? 0.9 : 1.0)
+                    .animation(.bouncy(duration: 0.3, extraBounce: 0.3), value: animate)
+            }
+            .buttonStyle(.plain)
+        }
+    }
 }

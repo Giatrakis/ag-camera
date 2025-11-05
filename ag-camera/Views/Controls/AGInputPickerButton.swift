@@ -8,17 +8,18 @@
 import SwiftUI
 
 public struct AGInputPickerButton: View {
-    @Binding var outputType: OutputType
+    @Binding var outputType: AGOutputType
     @State private var animate = false
     
     public var body: some View {
         Picker("", selection: $outputType) {
-            ForEach(OutputType.allCases) { type in
+            ForEach(AGOutputType.allCases) { type in
                 Text(type.title.uppercased())
                     .foregroundStyle(type == outputType ? .yellow : .white)
             }
         }
         .labelsHidden()
         .pickerStyle(.segmented)
+        .controlSize(.large)
     }
 }
