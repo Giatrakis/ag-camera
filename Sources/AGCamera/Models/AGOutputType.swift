@@ -7,12 +7,12 @@
 
 import Foundation
 
-enum AGOutputType: CaseIterable, Identifiable {
+public enum AGOutputType: CaseIterable, Identifiable {
     case photo, video
     
-    var id: Self { self }
+    public var id: Self { self }
     
-    var title: String {
+    public var title: String {
         switch self {
         case .photo:
             "Photo"

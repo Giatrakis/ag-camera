@@ -15,14 +15,12 @@ public struct AGCameraView: View {
     public var onZoomChanged: ((CGFloat) -> Void)?
     public var onError: ((Error) -> Void)?
 
-    @State private var capturedImage: UIImage?
     @State private var showError = false
     @State private var focusPoint: CGPoint?
     @State private var showFocusIndicator = false
     @State private var focusTask: Task<Void, Never>?
     @State private var flipRotation: Double = 0
     @State private var isBlurred: Bool = false
-    @State private var outputType: AGOutputType = .photo
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -84,7 +82,7 @@ public struct AGCameraView: View {
             }
             
             if configuration.showDefaultControls {
-                VStack {
+                VStack(spacing: 0) {
                     topControlsView
                     Spacer()
                     bottomControlsView
@@ -92,6 +90,39 @@ public struct AGCameraView: View {
             }
         }
         .ignoresSafeArea(edges: .bottom)
+        .onChange(of: manager.capturedImage) { _, newValue in
+            if let image = newValue {
+                onPhotoCaptured?(image)
+                manager.capturedImage = nil
+            }
+        }
+        .onChange(of: manager.lastVideoURL) { oldValue, newValue in
+            guard let url = newValue, oldValue != newValue else { return }
+
+            if manager.isRecording {
+                onVideoRecordingStarted?(url)
+            } else {
+                onVideoRecordingStopped?(url)
+            }
+
+            // Clear after handling so the same URL can trigger onChange again
+            manager.lastVideoURL = nil
+        }
+        .onChange(of: manager.currentZoomFactor) { _, newValue in
+            onZoomChanged?(newValue)
+        }
+        .onChange(of: manager.currentCameraPosition) { _, newValue in
+            onCameraPositionChanged?(newValue)
+        }
+        .onChange(of: manager.flashMode) { _, newValue in
+            onFlashModeChanged?(newValue)
+        }
+        .onChange(of: manager.error) { _, newValue in
+            if let error = newValue {
+                onError?(error)
+                showError = true
+            }
+        }
         .task {
             if configuration.handlePermissions {
                 let result = await manager.permissionManager.requestAllPermissions()
@@ -107,8 +138,17 @@ public struct AGCameraView: View {
         .onDisappear {
             manager.stopSession()
         }
-        .onChange(of: scenePhase) { oldPhase, newPhase in
-            handleScenePhaseChange(from: oldPhase, to: newPhase)
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .background:
+                manager.handleAppBackground()
+            case .active:
+                manager.handleAppForeground()
+            case .inactive:
+                break
+            @unknown default:
+                break
+            }
         }
         .alert("Error", isPresented: $showError) {
             Button("OK") {
@@ -118,13 +158,15 @@ public struct AGCameraView: View {
             Text(manager.error?.localizedDescription ?? "Unknown error")
         }
     }
-    
+}
+
+// MARK: Default Controls
+private extension AGCameraView {
     private var topControlsView: some View {
         HStack {
-            Button(action: {
+            Button {
                 manager.toggleFlash()
-                onFlashModeChanged?(manager.flashMode)
-            }) {
+            } label: {
                 Image(systemName: manager.flashIconName)
                     .font(.title2)
                     .foregroundColor(.white)
@@ -140,9 +182,9 @@ public struct AGCameraView: View {
                 Spacer()
             }
 
-            Button(action: {
+            Button {
                 try? manager.setSessionPreset(.hd4K3840x2160)
-            }) {
+            } label: {
                 Image(systemName: "gear")
                     .font(.title2)
                     .foregroundColor(.white)
@@ -155,34 +197,88 @@ public struct AGCameraView: View {
     
     private var bottomControlsView: some View {
         VStack(spacing: 30) {
-            AGSZoomControlView(manager: manager) { newZoomLevel in
-                setZoom(to: newZoomLevel)
-            }
+            zoomButton
             
-            switch outputType {
+            switch manager.outputType {
             case .photo:
-                AGCapturePhotoButton {
-                    await capturePhoto()
-                }
+                capturePhotoButton
             case .video:
-                AGCaptureVideoButton(isRecording: manager.isRecording) {
-                    await toggleVideoRecording()
-                }
+                captureVideoButton
             }
             
             HStack(spacing: 30) {
-                Circle()
-                    .frame(width: 50, height: 50)
-                AGInputPickerButton(outputType: $outputType)
-                AGSwitchCameraButton {
-                    await switchCamera()
-                }
+                Circle().frame(width: 50, height: 50)
+                AGInputPickerButton(outputType: $manager.outputType)
+                switchCameraButton
             }
         }
         .padding(.horizontal)
         .padding(.bottom, 30)
     }
+    
+    private var zoomButton: some View {
+        AGSZoomControlView(manager: manager) { newZoomLevel in
+            do {
+                try manager.setZoom(factor: newZoomLevel)
+            } catch {
+                Self.logger.error("Zoom error: \(error.localizedDescription)")
+                showError = true
+            }
+        }
+    }
+    
+    private var capturePhotoButton: some View {
+        AGCapturePhotoButton {
+            do {
+                _ = try await manager.capturePhoto()
+            } catch {
+                showError = true
+            }
+        }
+    }
+    
+    private var captureVideoButton: some View {
+        AGCaptureVideoButton(isRecording: manager.isRecording) {
+            do {
+                if manager.isRecording {
+                    _ = try await manager.stopVideoRecording()
+                } else {
+                    _ = try await manager.startVideoRecording()
+                }
+            } catch {
+                showError = true
+            }
+        }
+    }
+    
+    private var switchCameraButton: some View {
+        AGSwitchCameraButton {
+            let flipDirection: Double = manager.currentCameraPosition == .back ? 180 : -180
 
+            withAnimation(.easeOut(duration: 0.1)) {
+                isBlurred = true
+            }
+
+            withAnimation(.easeInOut(duration: 0.5)) {
+                flipRotation += flipDirection
+            }
+
+            try? await Task.sleep(nanoseconds: 250_000_000)
+
+            try? await manager.switchCamera()
+            onCameraPositionChanged?(manager.currentCameraPosition)
+
+            try? await Task.sleep(nanoseconds: 100_000_000)
+
+            withAnimation(.easeIn(duration: 0.15)) {
+                isBlurred = false
+            }
+        }
+    }
+}
+
+// MARK: Useful Methods
+private extension AGCameraView {
     private func setupCamera() async {
         do {
             try await manager.setupSession()
@@ -191,46 +287,6 @@ public struct AGCameraView: View {
             Self.logger.info("Camera Info - Min Zoom: \(String(format: "%.1f", manager.minZoomFactor))×, Max Zoom: \(String(format: "%.1f", manager.maxZoomFactor))×, Current Zoom: \(String(format: "%.1f", manager.currentZoomFactor))×")
         } catch {
             showError = true
-            onError?(error)
-        }
-    }
-
-    private func capturePhoto() async {
-        do {
-            let imageData = try await manager.capturePhoto()
-
-            if let image = UIImage(data: imageData) {
-                capturedImage = image
-                onPhotoCaptured?(image)
-                await MainActor.run {
-                    self.capturedImage = nil
-                }
-            }
-        } catch {
-            showError = true
-            onError?(error)
-        }
-    }
-
-    private func toggleVideoRecording() async {
-        if manager.isRecording {
-            do {
-                let videoURL = try await manager.stopVideoRecording()
-                onVideoRecordingStopped?(videoURL)
-                Self.logger.info("Video recording stopped: \(videoURL)")
-            } catch {
-                showError = true
-                onError?(error)
-            }
-        } else {
-            do {
-                let videoURL = try await manager.startVideoRecording()
-                onVideoRecordingStarted?(videoURL)
-                Self.logger.info("Video recording started: \(videoURL)")
-            } catch {
-                showError = true
-                onError?(error)
-            }
         }
     }
 
@@ -253,53 +309,6 @@ public struct AGCameraView: View {
             withAnimation {
                 showFocusIndicator = false
             }
-        }
-    }
-
-    private func setZoom(to level: CGFloat) {
-        do {
-            try manager.setZoom(factor: level)
-            onZoomChanged?(level)
-        } catch {
-            Self.logger.error("Zoom error: \(error.localizedDescription)")
-            showError = true
-            onError?(error)
-        }
-    }
-
-    private func switchCamera() async {
-        let flipDirection: Double = manager.currentCameraPosition == .back ? 180 : -180
-
-        withAnimation(.easeOut(duration: 0.1)) {
-            isBlurred = true
-        }
-
-        withAnimation(.easeInOut(duration: 0.5)) {
-            flipRotation += flipDirection
-        }
-
-        try? await Task.sleep(nanoseconds: 250_000_000)
-
-        try? await manager.switchCamera()
-        onCameraPositionChanged?(manager.currentCameraPosition)
-
-        try? await Task.sleep(nanoseconds: 100_000_000)
-
-        withAnimation(.easeIn(duration: 0.15)) {
-            isBlurred = false
-        }
-    }
-
-    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
-        switch newPhase {
-        case .background:
-            manager.handleAppBackground()
-        case .active:
-            manager.handleAppForeground()
-        case .inactive:
-            break
-        @unknown default:
-            break
         }
     }
 }

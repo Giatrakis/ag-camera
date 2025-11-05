@@ -13,8 +13,11 @@ class AGCaptureManager: NSObject {
 
     private let sessionManager: AGSessionManager
     private var photoCaptureCompletion: ((Result<Data, Error>) -> Void)?
+    private var photoCaptureTask: Task<Data, Error>?
     private var videoRecordingStartCompletion: ((Result<URL, Error>) -> Void)?
+    private var videoRecordingStartTask: Task<URL, Error>?
     private var videoRecordingStopCompletion: ((Result<URL, Error>) -> Void)?
+    private var videoRecordingStopTask: Task<URL, Error>?
 
     var flashMode: AVCaptureDevice.FlashMode = .off
 
@@ -36,19 +39,37 @@ class AGCaptureManager: NSObject {
             throw CameraError.captureFailed
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
-            self.photoCaptureCompletion = { result in
-                continuation.resume(with: result)
+        // If capture already in progress, return the existing task result
+        if let existingTask = photoCaptureTask {
+            return try await existingTask.value
+        }
+
+        let task = Task<Data, Error> {
+            try await withCheckedThrowingContinuation { continuation in
+                self.photoCaptureCompletion = { result in
+                    continuation.resume(with: result)
+                }
+
+                let photoSettings = AVCapturePhotoSettings()
+
+                if photoOutput.supportedFlashModes.contains(flashMode) {
+                    photoSettings.flashMode = flashMode
+                }
+
+                photoSettings.photoQualityPrioritization = .quality
+                photoOutput.capturePhoto(with: photoSettings, delegate: self)
             }
+        }
 
-            let photoSettings = AVCapturePhotoSettings()
+        photoCaptureTask = task
 
-            if photoOutput.supportedFlashModes.contains(flashMode) {
-                photoSettings.flashMode = flashMode
-            }
-
-            photoSettings.photoQualityPrioritization = .quality
-            photoOutput.capturePhoto(with: photoSettings, delegate: self)
+        do {
+            let result = try await task.value
+            photoCaptureTask = nil
+            return result
+        } catch {
+            photoCaptureTask = nil
+            throw error
         }
     }
 
@@ -61,19 +82,37 @@ class AGCaptureManager: NSObject {
             throw CameraError.recordingFailed
         }
 
-        isRecording = true
-        onRecordingStateChanged?(true, 0.0)
+        // If start already in progress, return the existing task result
+        if let existingTask = videoRecordingStartTask {
+            return try await existingTask.value
+        }
 
-        return try await withCheckedThrowingContinuation { continuation in
-            self.videoRecordingStartCompletion = { result in
-                continuation.resume(with: result)
+        let task = Task<URL, Error> {
+            self.isRecording = true
+            self.onRecordingStateChanged?(true, 0.0)
+
+            return try await withCheckedThrowingContinuation { continuation in
+                self.videoRecordingStartCompletion = { result in
+                    continuation.resume(with: result)
+                }
+
+                let outputURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString)
+                    .appendingPathExtension("mov")
+
+                movieFileOutput.startRecording(to: outputURL, recordingDelegate: self)
             }
+        }
 
-            let outputURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString)
-                .appendingPathExtension("mov")
+        videoRecordingStartTask = task
 
-            movieFileOutput.startRecording(to: outputURL, recordingDelegate: self)
+        do {
+            let result = try await task.value
+            videoRecordingStartTask = nil
+            return result
+        } catch {
+            videoRecordingStartTask = nil
+            throw error
         }
     }
 
@@ -86,12 +125,30 @@ class AGCaptureManager: NSObject {
             throw CameraError.recordingFailed
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
-            self.videoRecordingStopCompletion = { result in
-                continuation.resume(with: result)
-            }
+        // If stop already in progress, return the existing task result
+        if let existingTask = videoRecordingStopTask {
+            return try await existingTask.value
+        }
 
-            movieFileOutput.stopRecording()
+        let task = Task<URL, Error> {
+            try await withCheckedThrowingContinuation { continuation in
+                self.videoRecordingStopCompletion = { result in
+                    continuation.resume(with: result)
+                }
+
+                movieFileOutput.stopRecording()
+            }
+        }
+
+        videoRecordingStopTask = task
+
+        do {
+            let result = try await task.value
+            videoRecordingStopTask = nil
+            return result
+        } catch {
+            videoRecordingStopTask = nil
+            throw error
         }
     }
 
@@ -104,25 +161,27 @@ class AGCaptureManager: NSObject {
 
 extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
 
-    func photoOutput(
+    nonisolated func photoOutput(
         _ output: AVCapturePhotoOutput,
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
-        if let error = error {
-            photoCaptureCompletion?(.failure(error))
-            photoCaptureCompletion = nil
-            return
-        }
+        Task { @MainActor in
+            if let error = error {
+                photoCaptureCompletion?(.failure(error))
+                photoCaptureCompletion = nil
+                return
+            }
 
-        guard let imageData = photo.fileDataRepresentation() else {
-            photoCaptureCompletion?(.failure(CameraError.captureFailed))
-            photoCaptureCompletion = nil
-            return
-        }
+            guard let imageData = photo.fileDataRepresentation() else {
+                photoCaptureCompletion?(.failure(CameraError.captureFailed))
+                photoCaptureCompletion = nil
+                return
+            }
 
-        photoCaptureCompletion?(.success(imageData))
-        photoCaptureCompletion = nil
+            photoCaptureCompletion?(.success(imageData))
+            photoCaptureCompletion = nil
+        }
     }
 }
 

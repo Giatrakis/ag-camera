@@ -23,6 +23,12 @@ public class AGCameraManager: NSObject {
     public private(set) var recordingDuration: TimeInterval = 0.0
     public private(set) var currentZoomFactor: CGFloat = 1.0
     public private(set) var lastZoomFactor: CGFloat = 1.0
+    public var outputType: AGOutputType = .photo
+
+    // Observable state for reactive UI
+    public var capturedImage: UIImage?
+    public var lastVideoURL: URL?
+    public var lastCapturedPhotoData: Data?
 
     private let sessionManager: AGSessionManager
     private let captureManager: AGCaptureManager
@@ -124,7 +130,15 @@ extension AGCameraManager {
 extension AGCameraManager {
 
     public func capturePhoto() async throws -> Data {
-        return try await captureManager.capturePhoto()
+        let data = try await captureManager.capturePhoto()
+
+        // Set observable state for reactive UI
+        if let image = UIImage(data: data) {
+            capturedImage = image
+        }
+        lastCapturedPhotoData = data
+
+        return data
     }
 }
 
@@ -133,11 +147,15 @@ extension AGCameraManager {
 extension AGCameraManager {
 
     public func startVideoRecording() async throws -> URL {
-        return try await captureManager.startVideoRecording()
+        let url = try await captureManager.startVideoRecording()
+        lastVideoURL = url
+        return url
     }
 
     public func stopVideoRecording() async throws -> URL {
-        return try await captureManager.stopVideoRecording()
+        let url = try await captureManager.stopVideoRecording()
+        lastVideoURL = url
+        return url
     }
 }
 
@@ -185,6 +203,10 @@ extension AGCameraManager {
 
     public func setTorch(enabled: Bool) throws {
         try deviceControl.setTorch(enabled: enabled)
+    }
+
+    public func setOutputType(_ type: AGOutputType) {
+        outputType = type
     }
 }
 
