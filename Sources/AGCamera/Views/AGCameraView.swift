@@ -5,15 +5,6 @@ import OSLog
 public struct AGCameraView: View {
     private static let logger = Logger(subsystem: "com.agcamera", category: "CameraView")
     @Bindable var manager: AGCameraManager
-    private let configuration: AGCameraConfiguration
-
-    public var onPhotoCaptured: ((UIImage) -> Void)?
-    public var onVideoRecordingStarted: ((URL) -> Void)?
-    public var onVideoRecordingStopped: ((URL) -> Void)?
-    public var onFlashModeChanged: ((AVCaptureDevice.FlashMode) -> Void)?
-    public var onCameraPositionChanged: ((AVCaptureDevice.Position) -> Void)?
-    public var onZoomChanged: ((CGFloat) -> Void)?
-    public var onError: ((Error) -> Void)?
 
     @State private var showError = false
     @State private var focusPoint: CGPoint?
@@ -22,26 +13,8 @@ public struct AGCameraView: View {
 
     @Environment(\.scenePhase) private var scenePhase
 
-    public init(
-        manager: AGCameraManager,
-        configuration: AGCameraConfiguration = .default,
-        onPhotoCaptured: ((UIImage) -> Void)? = nil,
-        onVideoRecordingStarted: ((URL) -> Void)? = nil,
-        onVideoRecordingStopped: ((URL) -> Void)? = nil,
-        onFlashModeChanged: ((AVCaptureDevice.FlashMode) -> Void)? = nil,
-        onCameraPositionChanged: ((AVCaptureDevice.Position) -> Void)? = nil,
-        onZoomChanged: ((CGFloat) -> Void)? = nil,
-        onError: ((Error) -> Void)? = nil
-    ) {
+    public init(manager: AGCameraManager) {
         self.manager = manager
-        self.configuration = configuration
-        self.onPhotoCaptured = onPhotoCaptured
-        self.onVideoRecordingStarted = onVideoRecordingStarted
-        self.onVideoRecordingStopped = onVideoRecordingStopped
-        self.onFlashModeChanged = onFlashModeChanged
-        self.onCameraPositionChanged = onCameraPositionChanged
-        self.onZoomChanged = onZoomChanged
-        self.onError = onError
     }
     
     public var body: some View {
@@ -49,7 +22,7 @@ public struct AGCameraView: View {
             GeometryReader { previewGeometry in
                 AGCameraPreview(
                     session: manager.getCaptureSession(),
-                    videoGravity: configuration.videoGravity,
+                    videoGravity: manager.configuration.videoGravity,
                     cameraPosition: manager.currentCameraPosition
                 )
                 .ignoresSafeArea()
@@ -72,14 +45,14 @@ public struct AGCameraView: View {
                 )
                 .overlay {
                     if showFocusIndicator, let point = focusPoint {
-                        configuration.focusIndicator
+                        manager.configuration.focusIndicator
                             .position(point)
                             .allowsHitTesting(false)
                     }
                 }
             }
-            
-            if configuration.showDefaultControls {
+
+            if manager.configuration.showDefaultControls {
                 VStack(spacing: 0) {
                     topControlsView
                     Spacer()
@@ -90,7 +63,7 @@ public struct AGCameraView: View {
         .ignoresSafeArea(edges: .bottom)
         .onChange(of: manager.capturedImage) { _, newValue in
             if let image = newValue {
-                onPhotoCaptured?(image)
+                manager.onPhotoCapture?(image)
                 manager.capturedImage = nil
             }
         }
@@ -98,31 +71,30 @@ public struct AGCameraView: View {
             guard let url = newValue, oldValue != newValue else { return }
 
             if manager.isRecording {
-                onVideoRecordingStarted?(url)
+                manager.onVideoStarted?(url)
             } else {
-                onVideoRecordingStopped?(url)
+                manager.onVideoStopped?(url)
             }
 
-            // Clear after handling so the same URL can trigger onChange again
             manager.lastVideoURL = nil
         }
         .onChange(of: manager.currentZoomFactor) { _, newValue in
-            onZoomChanged?(newValue)
+            manager.onZoomChanged?(newValue)
         }
         .onChange(of: manager.currentCameraPosition) { _, newValue in
-            onCameraPositionChanged?(newValue)
+            manager.onCameraPositionChanged?(newValue)
         }
         .onChange(of: manager.flashMode) { _, newValue in
-            onFlashModeChanged?(newValue)
+            manager.onFlashModeChanged?(newValue)
         }
         .onChange(of: manager.error) { _, newValue in
             if let error = newValue {
-                onError?(error)
+                manager.onError?(error)
                 showError = true
             }
         }
         .task {
-            if configuration.handlePermissions {
+            if manager.configuration.handlePermissions {
                 let result = await manager.permissionManager.requestAllPermissions()
                 if result.allGranted {
                     await setupCamera()
@@ -295,4 +267,17 @@ private extension AGCameraView {
 #Preview {
     @Previewable let cameraManager = AGCameraManager()
     AGCameraView(manager: cameraManager)
+        .defaultCameraPosition(.back)
+        .defaultFlashMode(.auto)
+        .showDefaultControls(true)
+        .handlePermissions(true)
+        .onPhotoCapture { image in
+            print("Photo captured: \(image.size)")
+        }
+        .onVideoStopped { url in
+            print("Video saved to: \(url)")
+        }
+        .onError { error in
+            print("Camera error: \(error.localizedDescription)")
+        }
 }

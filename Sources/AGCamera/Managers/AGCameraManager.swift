@@ -34,6 +34,15 @@ public class AGCameraManager: NSObject {
     public var isBlurred: Bool = false
     public var flipRotation: Double = 0
 
+    // Callback handlers for events
+    public var onPhotoCapture: ((UIImage) -> Void)?
+    public var onVideoStarted: ((URL) -> Void)?
+    public var onVideoStopped: ((URL) -> Void)?
+    public var onCameraPositionChanged: ((AVCaptureDevice.Position) -> Void)?
+    public var onZoomChanged: ((CGFloat) -> Void)?
+    public var onFlashModeChanged: ((AVCaptureDevice.FlashMode) -> Void)?
+    public var onError: ((CameraError) -> Void)?
+
     private let sessionManager: AGSessionManager
     private let captureManager: AGCaptureManager
     private let deviceControl: AGDeviceControlManager
@@ -41,8 +50,8 @@ public class AGCameraManager: NSObject {
     private let zoomManager: AGZoomManager
     private let qualitySettings: AGQualitySettingsManager
     private let mediaLibrary: AGMediaLibraryManager
-    private let configuration: AGCameraConfiguration
 
+    public var configuration: AGCameraConfiguration
     public let permissionManager: AGPermissionManager
 
     public init(configuration: AGCameraConfiguration = .default) {
