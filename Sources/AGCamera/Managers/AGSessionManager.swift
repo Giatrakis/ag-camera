@@ -33,7 +33,7 @@ class AGSessionManager {
         }
     }
 
-    func setupSession(for position: AVCaptureDevice.Position) async throws {
+    func setupSession(for position: AVCaptureDevice.Position, preset: AVCaptureSession.Preset = .photo) async throws {
         guard permissionManager.isCameraAuthorized else {
             throw CameraError.permissionDenied
         }
@@ -48,8 +48,8 @@ class AGSessionManager {
                 do {
                     self.captureSession.beginConfiguration()
 
-                    if self.captureSession.canSetSessionPreset(.photo) {
-                        self.captureSession.sessionPreset = .photo
+                    if self.captureSession.canSetSessionPreset(preset) {
+                        self.captureSession.sessionPreset = preset
                     }
 
                     try self.setupVideoInput(for: position)
@@ -85,6 +85,10 @@ class AGSessionManager {
                 self.captureSession.stopRunning()
             }
         }
+    }
+
+    func setPhotoQualityPrioritization(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) {
+        photoOutput?.maxPhotoQualityPrioritization = prioritization
     }
 
     func switchCamera(to newPosition: AVCaptureDevice.Position) async throws {
@@ -138,7 +142,6 @@ class AGSessionManager {
 
         captureSession.addOutput(output)
         photoOutput = output
-        output.maxPhotoQualityPrioritization = .quality
     }
 
     private func setupMovieOutput() throws {

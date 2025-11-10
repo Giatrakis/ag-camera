@@ -68,10 +68,16 @@ class AGQualitySettingsManager {
             throw CameraError.cameraNotAvailable
         }
 
-        guard let format = device.formats.first(where: { format in
+        let compatibleFormats = device.formats.filter { format in
             format.videoSupportedFrameRateRanges.contains { range in
                 range.minFrameRate <= Double(fps) && Double(fps) <= range.maxFrameRate
             }
+        }
+
+        guard let format = compatibleFormats.max(by: { format1, format2 in
+            let dim1 = CMVideoFormatDescriptionGetDimensions(format1.formatDescription)
+            let dim2 = CMVideoFormatDescriptionGetDimensions(format2.formatDescription)
+            return (dim1.width * dim1.height) < (dim2.width * dim2.height)
         }) else {
             throw CameraError.invalidConfiguration
         }

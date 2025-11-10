@@ -9,6 +9,9 @@ public struct AGCameraConfiguration {
     public var defaultCameraPosition: AVCaptureDevice.Position
     public var defaultFlashMode: AVCaptureDevice.FlashMode
     public var defaultZoomScale: CGFloat
+    public var photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization
+    public var sessionPreset: AVCaptureSession.Preset
+    public var videoFrameRate: Int32
 
     public init(
         handlePermissions: Bool = true,
@@ -17,7 +20,10 @@ public struct AGCameraConfiguration {
         focusIndicator: some View = AGFocusIndicatorView(),
         defaultCameraPosition: AVCaptureDevice.Position = .back,
         defaultFlashMode: AVCaptureDevice.FlashMode = .off,
-        defaultZoomScale: CGFloat = 1.0
+        defaultZoomScale: CGFloat = 1.0,
+        photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization = .quality,
+        sessionPreset: AVCaptureSession.Preset = .photo,
+        videoFrameRate: Int32 = 30
     ) {
         self.handlePermissions = handlePermissions
         self.showDefaultControls = showDefaultControls
@@ -26,6 +32,9 @@ public struct AGCameraConfiguration {
         self.defaultCameraPosition = defaultCameraPosition
         self.defaultFlashMode = defaultFlashMode
         self.defaultZoomScale = defaultZoomScale
+        self.photoQualityPrioritization = photoQualityPrioritization
+        self.sessionPreset = sessionPreset
+        self.videoFrameRate = videoFrameRate
     }
 
     public static let `default` = AGCameraConfiguration()

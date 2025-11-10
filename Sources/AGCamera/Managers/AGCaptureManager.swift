@@ -56,7 +56,6 @@ class AGCaptureManager: NSObject {
                     photoSettings.flashMode = flashMode
                 }
 
-                photoSettings.photoQualityPrioritization = .quality
                 photoOutput.capturePhoto(with: photoSettings, delegate: self)
             }
         }

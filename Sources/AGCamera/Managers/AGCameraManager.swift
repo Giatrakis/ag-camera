@@ -105,8 +105,10 @@ extension AGCameraManager {
         }
 
         do {
-            try await sessionManager.setupSession(for: currentCameraPosition)
+            try await sessionManager.setupSession(for: currentCameraPosition, preset: configuration.sessionPreset)
             deviceControl.configureVideoMirroring(for: currentCameraPosition)
+
+            sessionManager.setPhotoQualityPrioritization(configuration.photoQualityPrioritization)
 
             try? zoomManager.setZoom(factor: configuration.defaultZoomScale)
             currentZoomFactor = configuration.defaultZoomScale
@@ -169,6 +171,13 @@ extension AGCameraManager {
 extension AGCameraManager {
 
     public func startVideoRecording() async throws -> URL {
+        let savedZoom = currentZoomFactor
+
+        try? qualitySettings.setFrameRate(fps: configuration.videoFrameRate)
+
+        try? zoomManager.setZoom(factor: savedZoom)
+        currentZoomFactor = savedZoom
+
         let url = try await captureManager.startVideoRecording()
         lastVideoURL = url
         return url

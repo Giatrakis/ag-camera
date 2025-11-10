@@ -95,6 +95,24 @@ extension AGCameraView {
         return self
     }
 
+    /// Set photo quality prioritization
+    public func photoQuality(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) -> Self {
+        manager.configuration.photoQualityPrioritization = prioritization
+        return self
+    }
+
+    /// Set session preset for capture quality
+    public func sessionPreset(_ preset: AVCaptureSession.Preset) -> Self {
+        manager.configuration.sessionPreset = preset
+        return self
+    }
+
+    /// Set video frame rate
+    public func videoFrameRate(_ fps: Int32) -> Self {
+        manager.configuration.videoFrameRate = fps
+        return self
+    }
+
     /// Customize the focus indicator view
     public func focusIndicator<V: View>(_ indicator: V) -> Self {
         manager.configuration.focusIndicator = AnyView(indicator)
