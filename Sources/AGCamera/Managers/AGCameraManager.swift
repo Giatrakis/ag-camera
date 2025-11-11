@@ -23,6 +23,7 @@ public class AGCameraManager: NSObject {
     public private(set) var recordingDuration: TimeInterval = 0.0
     public private(set) var currentZoomFactor: CGFloat = 1.0
     public private(set) var lastZoomFactor: CGFloat = 1.0
+    public private(set) var isTorchOn = false
     public var outputType: AGOutputType = .photo
 
     // Observable state for reactive UI
@@ -262,6 +263,25 @@ extension AGCameraManager {
 
     public func setTorch(enabled: Bool) throws {
         try deviceControl.setTorch(enabled: enabled)
+        isTorchOn = enabled
+    }
+
+    public func openTorch() throws {
+        try deviceControl.setTorch(enabled: true)
+        isTorchOn = true
+    }
+
+    public func closeTorch() throws {
+        try deviceControl.setTorch(enabled: false)
+        isTorchOn = false
+    }
+
+    public func toggleTorch() throws {
+        if isTorchOn {
+            try closeTorch()
+        } else {
+            try openTorch()
+        }
     }
 
     public func setOutputType(_ type: AGOutputType) {

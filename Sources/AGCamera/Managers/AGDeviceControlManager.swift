@@ -27,6 +27,10 @@ class AGDeviceControlManager {
             throw CameraError.cameraNotAvailable
         }
 
+        guard sessionManager.currentPosition == .back else {
+            throw CameraError.invalidConfiguration
+        }
+
         guard device.hasTorch && device.isTorchAvailable else {
             throw CameraError.invalidConfiguration
         }
