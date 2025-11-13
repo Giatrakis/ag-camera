@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		197050E7F6B243F7A1A389E6 /* README.md */ = {isa = PBXBuildFile; fileRef = 4A8535D4A6594AFF97A389E6; };
 		FAD35EF92EB4E2F0004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
 		FAD35F1F2EB4E99B004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
 		FAD35F202EB4E99B004AF78D /* ag_camera.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -44,6 +45,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4A8535D4A6594AFF97A389E6 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ag_camera.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAD35EF82EB4E2F0004AF78D /* ag-cameraTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "ag-cameraTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAD35F132EB4E8E9004AF78D /* ag-camera-app.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ag-camera-app.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -101,6 +103,7 @@
 		FAD35EEE2EB4E2F0004AF78D /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				4A8535D4A6594AFF97A389E6 /* README.md */,
 				FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */,
 				FAD35EF82EB4E2F0004AF78D /* ag-cameraTests.xctest */,
 				FAD35F132EB4E8E9004AF78D /* ag-camera-app.app */,
@@ -125,13 +128,13 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = FAD35F012EB4E2F0004AF78D /* Build configuration list for PBXNativeTarget "ag-camera" */;
 			buildPhases = (
-				D0180C4ACD2842B490A389E6 /* Build Target Dependencies */,
 				FAD35EE82EB4E2F0004AF78D /* Headers */,
 				FAD35EE92EB4E2F0004AF78D /* Sources */,
 				FAD35EEA2EB4E2F0004AF78D /* Frameworks */,
 				FAD35EEB2EB4E2F0004AF78D /* Resources */,
 			);
 			buildRules = (
+				2F672ADA6ED740059DA389E6 /* PBXBuildRule */,
 			);
 			dependencies = (
 			);
@@ -233,11 +236,15 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXBuildRule section */
+/* End PBXBuildRule section */
+
 /* Begin PBXResourcesBuildPhase section */
 		FAD35EEB2EB4E2F0004AF78D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				197050E7F6B243F7A1A389E6 /* README.md */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -258,24 +265,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		D0180C4ACD2842B490A389E6 /* Build Target Dependencies */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			alwaysOutOfDate = 1;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Build Target Dependencies";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			shellPath = /bin/sh;
-			showEnvVarsInLog = 0;			
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
