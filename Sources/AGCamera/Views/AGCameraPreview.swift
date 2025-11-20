@@ -48,23 +48,6 @@ struct AGCameraPreview: UIViewRepresentable {
     private func updateOrientation(for view: PreviewView, orientation: UIDeviceOrientation) {
         guard let connection = view.previewLayer.connection else { return }
 
-        let angle: CGFloat
-
-        switch orientation {
-        case .portrait:
-            angle = 90
-        case .portraitUpsideDown:
-            angle = 270
-        case .landscapeLeft:
-            angle = 180
-        case .landscapeRight:
-            angle = 0
-        default:
-            angle = 90 // Default to portrait
-        }
-
-        connection.videoRotationAngle = angle
-
         if connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
             connection.isVideoMirrored = false
