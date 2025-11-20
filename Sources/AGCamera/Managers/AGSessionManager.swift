@@ -48,7 +48,20 @@ class AGSessionManager {
                 do {
                     self.captureSession.beginConfiguration()
 
-                    if self.captureSession.canSetSessionPreset(preset) {
+                    // Map 4:3 presets to 16:9 equivalents to prevent stretching
+                    let adjustedPreset: AVCaptureSession.Preset
+                    switch preset {
+                    case .photo:
+                        adjustedPreset = .hd1920x1080
+                    case .high:
+                        adjustedPreset = .hd1920x1080
+                    default:
+                        adjustedPreset = preset
+                    }
+
+                    if self.captureSession.canSetSessionPreset(adjustedPreset) {
+                        self.captureSession.sessionPreset = adjustedPreset
+                    } else if self.captureSession.canSetSessionPreset(preset) {
                         self.captureSession.sessionPreset = preset
                     }
 
@@ -131,6 +144,11 @@ class AGSessionManager {
         captureSession.addInput(videoInput)
         videoDeviceInput = videoInput
         currentDevice = camera
+
+        // Log format dimensions for debugging
+        let dimensions = CMVideoFormatDescriptionGetDimensions(camera.activeFormat.formatDescription)
+        let aspectRatio = Float(dimensions.width) / Float(dimensions.height)
+        Self.logger.info("Camera \(position == .front ? "FRONT" : "BACK") - Format: \(dimensions.width)x\(dimensions.height), Aspect: \(String(format: "%.2f", aspectRatio)), Zoom multiplier: \(camera.displayVideoZoomFactorMultiplier)")
     }
 
     private func setupPhotoOutput() throws {
