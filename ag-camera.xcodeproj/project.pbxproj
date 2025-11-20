@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		197050E7F6B243F7A1A389E6 /* README.md */ = {isa = PBXBuildFile; fileRef = 4A8535D4A6594AFF97A389E6; };
+		197050E7F6B243F7A1A389E6 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 4A8535D4A6594AFF97A389E6 /* README.md */; };
 		FAD35EF92EB4E2F0004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
 		FAD35F1F2EB4E99B004AF78D /* ag_camera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; };
 		FAD35F202EB4E99B004AF78D /* ag_camera.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FAD35EED2EB4E2F0004AF78D /* ag_camera.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -134,7 +134,6 @@
 				FAD35EEB2EB4E2F0004AF78D /* Resources */,
 			);
 			buildRules = (
-				2F672ADA6ED740059DA389E6 /* PBXBuildRule */,
 			);
 			dependencies = (
 			);
@@ -236,15 +235,12 @@
 		};
 /* End PBXProject section */
 
-/* Begin PBXBuildRule section */
-/* End PBXBuildRule section */
-
 /* Begin PBXResourcesBuildPhase section */
 		FAD35EEB2EB4E2F0004AF78D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				197050E7F6B243F7A1A389E6 /* README.md */,
+				197050E7F6B243F7A1A389E6 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -263,9 +259,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		FAD35EE92EB4E2F0004AF78D /* Sources */ = {

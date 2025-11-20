@@ -34,6 +34,7 @@ public class AGCameraManager: NSObject {
     // Camera switch animation state
     public var isBlurred: Bool = false
     public var flipRotation: Double = 0
+    public var transitionSnapshot: UIImage?
 
     // Callback handlers for events
     public var onPhotoCapture: ((UIImage) -> Void)?
@@ -197,6 +198,12 @@ extension AGCameraManager {
 
     public func switchCamera(animated: Bool = true) async throws {
         if animated {
+            // Capture snapshot from current camera before switching
+            if let photoData = try? await captureManager.capturePhoto(),
+               let image = UIImage(data: photoData) {
+                transitionSnapshot = image
+            }
+
             let flipDirection: Double = currentCameraPosition == .back ? 180 : -180
 
             // Start blur animation
@@ -210,7 +217,7 @@ extension AGCameraManager {
             }
 
             // Wait for half the flip animation before switching
-            try await Task.sleep(nanoseconds: 250_000_000)
+            try await Task.sleep(nanoseconds: 100_000_000)
         }
 
         // Perform the actual camera switch
@@ -225,11 +232,12 @@ extension AGCameraManager {
         try? zoomManager.setZoom(factor: configuration.defaultZoomScale)
 
         if animated {
-            // Small delay before removing blur
+            // Wait for flip to complete and preview to stabilize
             try await Task.sleep(nanoseconds: 100_000_000)
 
-            // End blur animation
+            // Remove snapshot and blur
             withAnimation(.easeIn(duration: 0.15)) {
+                transitionSnapshot = nil
                 isBlurred = false
             }
         }

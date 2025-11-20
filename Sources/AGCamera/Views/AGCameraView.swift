@@ -38,7 +38,8 @@ public struct AGCameraView: View {
                             try? manager.updateZoomInteractively(scale: value, isGestureEnded: true)
                         }
                 )
-                .blur(radius: manager.isBlurred ? 20 : 0)
+                .overlay { transitionSnapshotOverlay }
+                .blur(radius: manager.isBlurred ? 50 : 0)
                 .rotation3DEffect(
                     .degrees(manager.flipRotation),
                     axis: (x: 0, y: 1, z: 0)
@@ -126,6 +127,19 @@ public struct AGCameraView: View {
             }
         } message: {
             Text(manager.error?.localizedDescription ?? "Unknown error")
+        }
+    }
+}
+
+// MARK: - Snapshot Overlay
+private extension AGCameraView {
+    @ViewBuilder
+    private var transitionSnapshotOverlay: some View {
+        if let snapshot = manager.transitionSnapshot {
+            Image(uiImage: snapshot)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .ignoresSafeArea()
         }
     }
 }
