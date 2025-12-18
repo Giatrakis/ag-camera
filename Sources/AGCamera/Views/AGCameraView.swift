@@ -42,10 +42,10 @@ public struct AGCameraView: View {
                 )
                 .overlay { transitionSnapshotOverlay }
                 .blur(radius: manager.isBlurred ? 50 : 0)
-                .rotation3DEffect(
-                    .degrees(manager.flipRotation),
-                    axis: (x: 0, y: 1, z: 0)
-                )
+//                .rotation3DEffect(
+//                    .degrees(manager.isBlurred ? manager.flipRotation : 0),
+//                    axis: (x: 0, y: 1, z: 0)
+//                )
                 .overlay {
                     if showFocusIndicator, let point = focusPoint {
                         manager.configuration.focusIndicator

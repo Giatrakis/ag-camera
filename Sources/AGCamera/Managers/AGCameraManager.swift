@@ -15,7 +15,7 @@ public class AGCameraManager: NSObject {
 
     private static let logger = Logger(subsystem: "com.agcamera", category: "CameraManager")
 
-    public private(set) var currentCameraPosition: AVCaptureDevice.Position = .back
+    public internal(set) var currentCameraPosition: AVCaptureDevice.Position = .back
     public private(set) var flashMode: AVCaptureDevice.FlashMode = .off
     public private(set) var isSessionRunning = false
     public private(set) var error: CameraError?
@@ -107,6 +107,7 @@ extension AGCameraManager {
         }
 
         do {
+            currentCameraPosition = configuration.defaultCameraPosition
             try await sessionManager.setupSession(for: currentCameraPosition, preset: configuration.sessionPreset)
             deviceControl.configureVideoMirroring(for: currentCameraPosition)
 

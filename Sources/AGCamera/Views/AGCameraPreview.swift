@@ -50,7 +50,7 @@ struct AGCameraPreview: UIViewRepresentable {
 
         if connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
-            connection.isVideoMirrored = false
+            connection.isVideoMirrored = (cameraPosition == .front)
             Self.logger.debug("Preview mirroring: \(connection.isVideoMirrored) (camera: \(cameraPosition == .front ? "front" : "back"))")
         }
     }

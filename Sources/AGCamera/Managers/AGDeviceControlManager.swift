@@ -46,7 +46,7 @@ class AGDeviceControlManager {
     }
 
     func configureVideoMirroring(for position: AVCaptureDevice.Position) {
-        let shouldMirror = false
+        let shouldMirror = position == .front
 
         Self.logger.debug("Configuring mirroring for \(position == .front ? "FRONT" : "BACK") camera - shouldMirror: \(shouldMirror)")
 
