@@ -7,11 +7,11 @@ import AVFoundation
 import OSLog
 
 @MainActor
-class AGSessionManager {
+public class AGSessionManager {
 
     private static let logger = Logger(subsystem: "com.agcamera", category: "SessionManager")
 
-    let captureSession = AVCaptureSession()
+    public let captureSession = AVCaptureSession()
     let sessionQueue = DispatchQueue(label: "com.agcamera.sessionQueue")
 
     private(set) var videoDeviceInput: AVCaptureDeviceInput?

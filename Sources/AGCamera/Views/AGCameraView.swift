@@ -26,8 +26,10 @@ public struct AGCameraView: View {
                     cameraPosition: manager.currentCameraPosition
                 )
                 .ignoresSafeArea()
-                .onTapGesture { location in
-                    handleTapToFocus(at: location, in: previewGeometry.size)
+                .conditionalModifier(manager.configuration.enableTapToFocus) { view in
+                    view.onTapGesture { location in
+                        handleTapToFocus(at: location, in: previewGeometry.size)
+                    }
                 }
                 .gesture(
                     MagnificationGesture()

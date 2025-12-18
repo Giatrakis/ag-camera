@@ -4,6 +4,7 @@ import AVFoundation
 public struct AGCameraConfiguration {
     public var handlePermissions: Bool
     public var showDefaultControls: Bool
+    public var enableTapToFocus: Bool
     public var videoGravity: AVLayerVideoGravity
     public var focusIndicator: AnyView
     public var defaultCameraPosition: AVCaptureDevice.Position
@@ -16,6 +17,7 @@ public struct AGCameraConfiguration {
     public init(
         handlePermissions: Bool = true,
         showDefaultControls: Bool = true,
+        enableTapToFocus: Bool = true,
         videoGravity: AVLayerVideoGravity = .resizeAspectFill,
         focusIndicator: some View = AGFocusIndicatorView(),
         defaultCameraPosition: AVCaptureDevice.Position = .back,
@@ -27,6 +29,7 @@ public struct AGCameraConfiguration {
     ) {
         self.handlePermissions = handlePermissions
         self.showDefaultControls = showDefaultControls
+        self.enableTapToFocus = enableTapToFocus
         self.videoGravity = videoGravity
         self.focusIndicator = AnyView(focusIndicator)
         self.defaultCameraPosition = defaultCameraPosition

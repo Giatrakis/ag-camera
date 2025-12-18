@@ -89,6 +89,14 @@ extension AGCameraView {
         return self
     }
 
+    /// Enable/disable tap to focus functionality
+    public func enableTapToFocus(_ enabled: Bool) -> Self {
+        Task { @MainActor in
+            manager.configuration.enableTapToFocus = enabled
+        }
+        return self
+    }
+
     /// Set video preview gravity mode
     public func videoGravity(_ gravity: AVLayerVideoGravity) -> Self {
         Task { @MainActor in

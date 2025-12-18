@@ -45,7 +45,7 @@ public class AGCameraManager: NSObject {
     public var onFlashModeChanged: ((AVCaptureDevice.FlashMode) -> Void)?
     public var onError: ((CameraError) -> Void)?
 
-    private let sessionManager: AGSessionManager
+    public let sessionManager: AGSessionManager
     private let captureManager: AGCaptureManager
     private let deviceControl: AGDeviceControlManager
     private let focusExposure: AGFocusExposureManager
