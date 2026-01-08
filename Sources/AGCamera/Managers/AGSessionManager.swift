@@ -22,6 +22,7 @@ public class AGSessionManager {
     private(set) var currentPosition: AVCaptureDevice.Position = .back
 
     private let permissionManager: AGPermissionManager
+    private var isSwitchingCamera = false
 
     init(permissionManager: AGPermissionManager) {
         self.permissionManager = permissionManager
@@ -105,24 +106,40 @@ public class AGSessionManager {
     }
 
     func switchCamera(to newPosition: AVCaptureDevice.Position) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            sessionQueue.async { [weak self] in
-                guard let self = self else {
-                    continuation.resume(throwing: CameraError.setupFailed)
-                    return
-                }
+        if isSwitchingCamera {
+            Self.logger.warning("⚠️ Camera switch blocked - already in progress")
+            return
+        }
 
-                do {
-                    self.captureSession.beginConfiguration()
-                    try self.setupVideoInput(for: newPosition)
-                    self.currentPosition = newPosition
-                    self.captureSession.commitConfiguration()
-                    continuation.resume()
-                } catch {
-                    self.captureSession.commitConfiguration()
-                    continuation.resume(throwing: error)
+        Self.logger.info("📷 Starting camera switch to: \(newPosition == .front ? "front" : "back")")
+        isSwitchingCamera = true
+
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                sessionQueue.async { [weak self] in
+                    guard let self = self else {
+                        continuation.resume(throwing: CameraError.setupFailed)
+                        return
+                    }
+
+                    do {
+                        self.captureSession.beginConfiguration()
+                        try self.setupVideoInput(for: newPosition)
+                        self.currentPosition = newPosition
+                        self.captureSession.commitConfiguration()
+                        Self.logger.info("✅ Camera switch completed successfully")
+                        continuation.resume()
+                    } catch {
+                        self.captureSession.commitConfiguration()
+                        Self.logger.error("❌ Camera switch failed: \(error.localizedDescription)")
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
+            isSwitchingCamera = false
+        } catch {
+            isSwitchingCamera = false
+            throw error
         }
     }
 
