@@ -123,13 +123,13 @@ public struct AGCameraView: View {
                 break
             }
         }
-        .alert("Error", isPresented: $showError) {
-            Button("OK") {
-                showError = false
-            }
-        } message: {
-            Text(manager.error?.localizedDescription ?? "Unknown error")
-        }
+//        .alert("Error", isPresented: $showError) {
+//            Button("OK") {
+//                showError = false
+//            }
+//        } message: {
+//            Text(manager.error?.localizedDescription ?? "Unknown error")
+//        }
     }
 }
 

@@ -24,6 +24,7 @@ public class AGCameraManager: NSObject {
     public private(set) var currentZoomFactor: CGFloat = 1.0
     public private(set) var lastZoomFactor: CGFloat = 1.0
     public private(set) var isTorchOn = false
+    public private(set) var isSwitchingCamera = false
     public var outputType: AGOutputType = .photo
 
     // Observable state for reactive UI
@@ -157,6 +158,11 @@ extension AGCameraManager {
 extension AGCameraManager {
 
     public func capturePhoto() async throws -> Data {
+        guard !isSwitchingCamera else {
+            Self.logger.warning("⚠️ Photo capture blocked - camera switch in progress")
+            throw CameraError.cameraSwitchInProgress
+        }
+
         let data = try await captureManager.capturePhoto()
 
         // Set observable state for reactive UI
@@ -174,6 +180,11 @@ extension AGCameraManager {
 extension AGCameraManager {
 
     public func startVideoRecording() async throws -> URL {
+        guard !isSwitchingCamera else {
+            Self.logger.warning("⚠️ Video recording blocked - camera switch in progress")
+            throw CameraError.cameraSwitchInProgress
+        }
+
         let savedZoom = currentZoomFactor
 
         try? qualitySettings.setFrameRate(fps: configuration.videoFrameRate)
@@ -198,49 +209,63 @@ extension AGCameraManager {
 extension AGCameraManager {
 
     public func switchCamera(animated: Bool = true) async throws {
-        if animated {
-            // Capture snapshot from current camera before switching
-            if let photoData = try? await captureManager.capturePhoto(),
-               let image = UIImage(data: photoData) {
-                transitionSnapshot = image
-            }
-
-            let flipDirection: Double = currentCameraPosition == .back ? 180 : -180
-
-            // Start blur animation
-            withAnimation(.easeOut(duration: 0.1)) {
-                isBlurred = true
-            }
-
-            // Start flip animation
-            withAnimation(.easeInOut(duration: 0.5)) {
-                flipRotation += flipDirection
-            }
-
-            // Wait for half the flip animation before switching
-            try await Task.sleep(nanoseconds: 100_000_000)
+        guard !isSwitchingCamera else {
+            Self.logger.warning("⚠️ Camera switch blocked - already in progress")
+            return
         }
 
-        // Perform the actual camera switch
-        let newPosition: AVCaptureDevice.Position = (currentCameraPosition == .back) ? .front : .back
+        isSwitchingCamera = true
 
-        try await sessionManager.switchCamera(to: newPosition)
-        deviceControl.configureVideoMirroring(for: newPosition)
+        do {
+            if animated {
+                // Capture snapshot from current camera before switching
+                if let photoData = try? await captureManager.capturePhoto(),
+                   let image = UIImage(data: photoData) {
+                    transitionSnapshot = image
+                }
 
-        currentCameraPosition = newPosition
-        currentZoomFactor = configuration.defaultZoomScale
-        lastZoomFactor = configuration.defaultZoomScale
-        try? zoomManager.setZoom(factor: configuration.defaultZoomScale)
+                let flipDirection: Double = currentCameraPosition == .back ? 180 : -180
 
-        if animated {
-            // Wait for flip to complete and preview to stabilize
-            try await Task.sleep(nanoseconds: 100_000_000)
+                // Start blur animation
+                withAnimation(.easeOut(duration: 0.1)) {
+                    isBlurred = true
+                }
 
-            // Remove snapshot and blur
-            withAnimation(.easeIn(duration: 0.15)) {
-                transitionSnapshot = nil
-                isBlurred = false
+                // Start flip animation
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    flipRotation += flipDirection
+                }
+
+                // Wait for half the flip animation before switching
+                try await Task.sleep(nanoseconds: 100_000_000)
             }
+
+            // Perform the actual camera switch
+            let newPosition: AVCaptureDevice.Position = (currentCameraPosition == .back) ? .front : .back
+
+            try await sessionManager.switchCamera(to: newPosition)
+            deviceControl.configureVideoMirroring(for: newPosition)
+
+            currentCameraPosition = newPosition
+            currentZoomFactor = configuration.defaultZoomScale
+            lastZoomFactor = configuration.defaultZoomScale
+            try? zoomManager.setZoom(factor: configuration.defaultZoomScale)
+
+            if animated {
+                // Wait for flip to complete and preview to stabilize
+                try await Task.sleep(nanoseconds: 100_000_000)
+
+                // Remove snapshot and blur
+                withAnimation(.easeIn(duration: 0.15)) {
+                    transitionSnapshot = nil
+                    isBlurred = false
+                }
+            }
+
+            isSwitchingCamera = false
+        } catch {
+            isSwitchingCamera = false
+            throw error
         }
     }
 
@@ -465,6 +490,7 @@ public enum CameraError: LocalizedError, Sendable {
     case captureFailed
     case recordingFailed
     case invalidConfiguration
+    case cameraSwitchInProgress
 
     public var errorDescription: String? {
         switch self {
@@ -480,6 +506,8 @@ public enum CameraError: LocalizedError, Sendable {
             return "Failed to record video."
         case .invalidConfiguration:
             return "Invalid camera configuration."
+        case .cameraSwitchInProgress:
+            return "Camera is currently switching. Please wait."
         }
     }
 }
