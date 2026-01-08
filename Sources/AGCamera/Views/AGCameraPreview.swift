@@ -34,9 +34,9 @@ struct AGCameraPreview: UIViewRepresentable {
         view.cameraPosition = cameraPosition
         view.orientationUpdateHandler = { [weak view] in
             guard let view = view else { return }
-            self.updateOrientationFromView(for: view)
+            self.updateMirroring(for: view)
         }
-        updateOrientation(for: view, orientation: UIDevice.current.orientation)
+        updateMirroring(for: view)
         return view
     }
 
@@ -44,26 +44,16 @@ struct AGCameraPreview: UIViewRepresentable {
         uiView.previewLayer.session = session
         uiView.previewLayer.videoGravity = videoGravity
         uiView.cameraPosition = cameraPosition
-        updateOrientation(for: uiView, orientation: UIDevice.current.orientation)
+        updateMirroring(for: uiView)
     }
 
-    private func updateOrientation(for view: PreviewView, orientation: UIDeviceOrientation) {
-        guard let connection = view.previewLayer.connection else { return }
-
-        if connection.isVideoMirroringSupported {
-            connection.automaticallyAdjustsVideoMirroring = false
-            connection.isVideoMirrored = (cameraPosition == .front)
-            Self.logger.debug("Preview mirroring: \(connection.isVideoMirrored) (camera: \(cameraPosition == .front ? "front" : "back"))")
-        }
-    }
-
-    private func updateOrientationFromView(for view: PreviewView) {
+    private func updateMirroring(for view: PreviewView) {
         guard let connection = view.previewLayer.connection else { return }
 
         if connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
             connection.isVideoMirrored = (view.cameraPosition == .front)
-            Self.logger.debug("Preview mirroring (from view): \(connection.isVideoMirrored) (camera: \(view.cameraPosition == .front ? "front" : "back"))")
+            Self.logger.debug("Preview mirroring: \(connection.isVideoMirrored) (camera: \(view.cameraPosition == .front ? "front" : "back"))")
         }
     }
 
