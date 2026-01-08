@@ -31,9 +31,10 @@ struct AGCameraPreview: UIViewRepresentable {
         let view = PreviewView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = videoGravity
-        view.orientationUpdateHandler = { [weak view] orientation in
+        view.cameraPosition = cameraPosition
+        view.orientationUpdateHandler = { [weak view] in
             guard let view = view else { return }
-            self.updateOrientation(for: view, orientation: orientation)
+            self.updateOrientationFromView(for: view)
         }
         updateOrientation(for: view, orientation: UIDevice.current.orientation)
         return view
@@ -42,6 +43,7 @@ struct AGCameraPreview: UIViewRepresentable {
     func updateUIView(_ uiView: PreviewView, context: Context) {
         uiView.previewLayer.session = session
         uiView.previewLayer.videoGravity = videoGravity
+        uiView.cameraPosition = cameraPosition
         updateOrientation(for: uiView, orientation: UIDevice.current.orientation)
     }
 
@@ -55,8 +57,19 @@ struct AGCameraPreview: UIViewRepresentable {
         }
     }
 
+    private func updateOrientationFromView(for view: PreviewView) {
+        guard let connection = view.previewLayer.connection else { return }
+
+        if connection.isVideoMirroringSupported {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = (view.cameraPosition == .front)
+            Self.logger.debug("Preview mirroring (from view): \(connection.isVideoMirrored) (camera: \(view.cameraPosition == .front ? "front" : "back"))")
+        }
+    }
+
     class PreviewView: UIView {
-        var orientationUpdateHandler: ((UIDeviceOrientation) -> Void)?
+        var orientationUpdateHandler: (() -> Void)?
+        var cameraPosition: AVCaptureDevice.Position = .back
 
         var previewLayer: AVCaptureVideoPreviewLayer {
             guard let previewLayer = layer as? AVCaptureVideoPreviewLayer else {
@@ -93,7 +106,7 @@ struct AGCameraPreview: UIViewRepresentable {
 
         override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
             super.traitCollectionDidChange(previousTraitCollection)
-            orientationUpdateHandler?(UIDevice.current.orientation)
+            orientationUpdateHandler?()
         }
     }
 }
