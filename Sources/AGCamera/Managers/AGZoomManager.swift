@@ -4,54 +4,66 @@
 //
 
 import AVFoundation
-import OSLog
 import CoreGraphics
 
 @MainActor
 class AGZoomManager {
 
-    private static let logger = Logger(subsystem: "com.agcamera", category: "ZoomManager")
-
     private let sessionManager: AGSessionManager
+    private let log: AGCameraLog
 
     private var displayZoomMultiplier: CGFloat {
         guard let device = sessionManager.currentDevice else { return 1.0 }
         return device.displayVideoZoomFactorMultiplier
     }
 
-    init(sessionManager: AGSessionManager) {
+    init(sessionManager: AGSessionManager, log: AGCameraLog) {
         self.sessionManager = sessionManager
+        self.log = log
     }
 
-    @discardableResult func setZoom(factor: CGFloat) throws -> CGFloat {
-        guard let device = sessionManager.currentDevice else {
-            Self.logger.error("No current device available for zoom")
-            throw CameraError.cameraNotAvailable
+    @discardableResult func setZoom(factor: CGFloat, maximumZoomFactor: CGFloat? = nil) async throws -> CGFloat {
+        guard factor.isFinite, factor > 0 else {
+            throw CameraError.invalidConfiguration
+        }
+        if let maximumZoomFactor {
+            guard maximumZoomFactor.isFinite, maximumZoomFactor > 0 else {
+                throw CameraError.invalidConfiguration
+            }
         }
 
-        let deviceZoom = factor / displayZoomMultiplier
-        let clampedDeviceZoom = min(max(deviceZoom, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
-        let clampedUIZoom = clampedDeviceZoom * displayZoomMultiplier
+        return try await sessionManager.performDeviceOperation { [log] device, position in
+            let multiplier = device.displayVideoZoomFactorMultiplier
+            guard multiplier.isFinite, multiplier > 0 else {
+                throw CameraError.invalidConfiguration
+            }
+            let hardwareMinimum = device.minAvailableVideoZoomFactor * multiplier
+            let hardwareMaximum = device.maxAvailableVideoZoomFactor * multiplier
+            let defaultMaximum: CGFloat = position == .front ? 3.0 : 15.0
+            let requestedMaximum = maximumZoomFactor ?? defaultMaximum
+            let maxUIZoom = max(hardwareMinimum, min(requestedMaximum, hardwareMaximum))
+            let requestedZoom = min(max(factor, hardwareMinimum), maxUIZoom)
+            let deviceZoom = requestedZoom / multiplier
 
-        Self.logger.debug("setZoom - UI requested: \(String(format: "%.2f", factor))×, Display multiplier: \(String(format: "%.2f", self.displayZoomMultiplier)), Device zoom: \(String(format: "%.2f", deviceZoom)), Device range: [\(String(format: "%.2f", device.minAvailableVideoZoomFactor))-\(String(format: "%.2f", device.maxAvailableVideoZoomFactor))], Clamped: \(String(format: "%.2f", clampedDeviceZoom)), Final UI: \(String(format: "%.2f", clampedUIZoom))×")
-
-        try device.lockForConfiguration()
-        defer { device.unlockForConfiguration() }
-
-        device.videoZoomFactor = clampedDeviceZoom
-        Self.logger.debug("Applied videoZoomFactor = \(clampedDeviceZoom)")
-
-        return clampedUIZoom
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            device.videoZoomFactor = deviceZoom
+            let applied = device.videoZoomFactor * multiplier
+            log.debug("Applied display zoom \(applied)×", category: "ZoomManager")
+            return applied
+        }
     }
 
-    func getMaxZoomFactor(for position: AVCaptureDevice.Position) -> CGFloat {
+    func getMaxZoomFactor(
+        for position: AVCaptureDevice.Position,
+        configuredMaximum: CGFloat? = nil
+    ) -> CGFloat {
         guard let device = sessionManager.currentDevice else { return 1.0 }
-        let deviceMax = device.maxAvailableVideoZoomFactor
-
-        let maxUIZoom: CGFloat = (position == .front) ? 3.0 : 15.0
-        let cappedDeviceMax = min(deviceMax, maxUIZoom / displayZoomMultiplier)
-
-        return cappedDeviceMax * displayZoomMultiplier
+        let hardwareMinimum = device.minAvailableVideoZoomFactor * displayZoomMultiplier
+        let hardwareMaximum = device.maxAvailableVideoZoomFactor * displayZoomMultiplier
+        let defaultMaximum: CGFloat = position == .front ? 3.0 : 15.0
+        let requestedMaximum = configuredMaximum ?? defaultMaximum
+        return max(hardwareMinimum, min(requestedMaximum, hardwareMaximum))
     }
 
     func getMinZoomFactor() -> CGFloat {

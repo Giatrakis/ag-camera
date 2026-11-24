@@ -2,6 +2,12 @@ import SwiftUI
 import AVFoundation
 
 extension AGCameraView {
+    private func overriding<Value>(_ keyPath: WritableKeyPath<AGCameraConfiguration, Value>, with value: Value) -> Self {
+        var view = self
+        view.configurationOverrides.append { $0[keyPath: keyPath] = value }
+        return view
+    }
+
     public func onPhotoCapture(_ action: @escaping (UIImage) -> Void) -> Self {
         var view = self
         view.photoCaptureAction = action
@@ -45,68 +51,88 @@ extension AGCameraView {
     }
 
     public func handlePermissions(_ enabled: Bool) -> Self {
-        var view = self
-        view.configuration.handlePermissions = enabled
-        return view
+        overriding(\.handlePermissions, with: enabled)
     }
 
     public func showDefaultControls(_ show: Bool) -> Self {
-        var view = self
-        view.configuration.showDefaultControls = show
-        return view
+        overriding(\.showDefaultControls, with: show)
     }
 
     public func enableTapToFocus(_ enabled: Bool) -> Self {
-        var view = self
-        view.configuration.enableTapToFocus = enabled
-        return view
+        if !enabled { return tapToFocusBehavior(.none) }
+        let behavior = configuration.tapToFocusBehavior
+        return tapToFocusBehavior(behavior == .none ? .focusAndExposure : behavior)
+    }
+
+    public func tapToFocusBehavior(_ behavior: AGTapToFocusBehavior) -> Self {
+        overriding(\.tapToFocusBehavior, with: behavior)
+    }
+
+    public func grid(_ grid: AGCameraGrid) -> Self {
+        overriding(\.grid, with: grid)
     }
 
     public func videoGravity(_ gravity: AVLayerVideoGravity) -> Self {
-        var view = self
-        view.configuration.videoGravity = gravity
-        return view
+        overriding(\.videoGravity, with: gravity)
     }
 
     public func defaultCameraPosition(_ position: AVCaptureDevice.Position) -> Self {
-        var view = self
-        view.configuration.defaultCameraPosition = position
-        return view
+        overriding(\.defaultCameraPosition, with: position)
     }
 
     public func defaultFlashMode(_ mode: AVCaptureDevice.FlashMode) -> Self {
-        var view = self
-        view.configuration.defaultFlashMode = mode
-        return view
+        overriding(\.defaultFlashMode, with: mode)
     }
 
     public func defaultZoomScale(_ scale: CGFloat) -> Self {
-        var view = self
-        view.configuration.defaultZoomScale = scale
-        return view
+        overriding(\.defaultZoomScale, with: scale)
+    }
+
+    public func maxFrontZoomFactor(_ factor: CGFloat) -> Self {
+        overriding(\.maxFrontZoomFactor, with: factor)
+    }
+
+    public func maxBackZoomFactor(_ factor: CGFloat) -> Self {
+        overriding(\.maxBackZoomFactor, with: factor)
+    }
+
+    public func mirrorFrontCamera(_ enabled: Bool) -> Self {
+        overriding(\.mirrorFrontCamera, with: enabled)
+    }
+
+    public func torchLevel(_ level: Float) -> Self {
+        overriding(\.torchLevel, with: level)
+    }
+
+    public func defaultFocusMode(_ mode: AVCaptureDevice.FocusMode) -> Self {
+        overriding(\.defaultFocusMode, with: mode)
+    }
+
+    public func defaultExposureMode(_ mode: AVCaptureDevice.ExposureMode) -> Self {
+        overriding(\.defaultExposureMode, with: mode)
     }
 
     public func photoQuality(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) -> Self {
-        var view = self
-        view.configuration.photoQualityPrioritization = prioritization
-        return view
+        overriding(\.photoQualityPrioritization, with: prioritization)
     }
 
     public func sessionPreset(_ preset: AVCaptureSession.Preset) -> Self {
-        var view = self
-        view.configuration.sessionPreset = preset
-        return view
+        overriding(\.sessionPreset, with: preset)
     }
 
     public func videoFrameRate(_ fps: Int32) -> Self {
-        var view = self
-        view.configuration.videoFrameRate = fps
-        return view
+        overriding(\.videoFrameRate, with: fps)
+    }
+
+    public func videoCodec(_ codec: AVVideoCodecType?) -> Self {
+        overriding(\.videoCodec, with: codec)
+    }
+
+    public func enableLogging(_ enabled: Bool) -> Self {
+        overriding(\.enableLogging, with: enabled)
     }
 
     public func focusIndicator<V: View>(_ indicator: V) -> Self {
-        var view = self
-        view.configuration.focusIndicator = AnyView(indicator)
-        return view
+        overriding(\.focusIndicator, with: AnyView(indicator))
     }
 }

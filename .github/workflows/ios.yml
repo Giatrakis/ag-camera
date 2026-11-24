@@ -1,0 +1,17 @@
+name: iOS
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Swift package
+        run: swift build --triple arm64-apple-ios18.0-simulator --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)"
+      - name: Test Xcode framework
+        run: xcodebuild -project ag-camera.xcodeproj -scheme ag-camera -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' CODE_SIGNING_ALLOWED=NO test
+      - name: Build demo app
+        run: xcodebuild -project ag-camera.xcodeproj -scheme ag-camera-app -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build

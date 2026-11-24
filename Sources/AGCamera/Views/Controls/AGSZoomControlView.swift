@@ -11,6 +11,11 @@ public struct AGSZoomControlView: View {
     @Bindable var manager: AGCameraManager
     var onZoomChange: (CGFloat) -> Void
     @State private var animate = false
+
+    public init(manager: AGCameraManager, onZoomChange: @escaping (CGFloat) -> Void) {
+        self.manager = manager
+        self.onZoomChange = onZoomChange
+    }
     
     private var zoomLevels: [CGFloat] {
         Array(manager.availableZoomLevels.prefix(3))

@@ -9,6 +9,10 @@ import SwiftUI
 
 public struct AGVideoDurationView: View {
     let duration: String
+
+    public init(duration: String) {
+        self.duration = duration
+    }
     
     public var body: some View {
         Text(duration)

@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "ag-camera",
     platforms: [
-        .iOS("26.0")
+        .iOS("18.0")
     ],
     products: [
         .library(

@@ -4,15 +4,14 @@
 //
 
 import AVFoundation
-import OSLog
 
 @MainActor
 class AGCaptureManager: NSObject {
 
-    private static let logger = Logger(subsystem: "com.agcamera", category: "CaptureManager")
-
     private let sessionManager: AGSessionManager
+    private let log: AGCameraLog
     private var photoCaptureCompletion: ((Result<Data, Error>) -> Void)?
+    private var photoProcessingResult: Result<Data, Error>?
     private var photoCaptureTask: Task<Data, Error>?
     private var videoRecordingStartCompletion: ((Result<URL, Error>) -> Void)?
     private var videoRecordingStartTask: Task<URL, Error>?
@@ -20,6 +19,8 @@ class AGCaptureManager: NSObject {
     private var videoRecordingStopTask: Task<URL, Error>?
 
     var flashMode: AVCaptureDevice.FlashMode = .off
+    var photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization = .quality
+    var videoCodec: AVVideoCodecType?
 
     private(set) var isRecording = false
     private(set) var recordingDuration: TimeInterval = 0.0
@@ -29,8 +30,9 @@ class AGCaptureManager: NSObject {
 
     var onRecordingStateChanged: ((Bool, TimeInterval) -> Void)?
 
-    init(sessionManager: AGSessionManager) {
+    init(sessionManager: AGSessionManager, log: AGCameraLog) {
         self.sessionManager = sessionManager
+        self.log = log
         super.init()
     }
 
@@ -49,8 +51,10 @@ class AGCaptureManager: NSObject {
                 self.photoCaptureCompletion = { result in
                     continuation.resume(with: result)
                 }
+                self.photoProcessingResult = nil
 
                 let photoSettings = AVCapturePhotoSettings()
+                photoSettings.photoQualityPrioritization = photoQualityPrioritization
 
                 if photoOutput.supportedFlashModes.contains(flashMode) {
                     photoSettings.flashMode = flashMode
@@ -77,6 +81,10 @@ class AGCaptureManager: NSObject {
             throw CameraError.recordingFailed
         }
 
+        guard movieFileOutput.connection(with: .audio) != nil else {
+            throw CameraError.recordingFailed
+        }
+
         guard !movieFileOutput.isRecording else {
             throw CameraError.recordingFailed
         }
@@ -84,6 +92,20 @@ class AGCaptureManager: NSObject {
         // If start already in progress, return the existing task result
         if let existingTask = videoRecordingStartTask {
             return try await existingTask.value
+        }
+
+        guard let videoConnection = movieFileOutput.connection(with: .video) else {
+            throw CameraError.recordingFailed
+        }
+
+        if let videoCodec {
+            guard movieFileOutput.supportedOutputSettingsKeys(for: videoConnection).contains(AVVideoCodecKey),
+                  movieFileOutput.availableVideoCodecTypes.contains(videoCodec) else {
+                throw CameraError.invalidConfiguration
+            }
+            movieFileOutput.setOutputSettings([AVVideoCodecKey: videoCodec], for: videoConnection)
+        } else {
+            movieFileOutput.setOutputSettings(nil, for: videoConnection)
         }
 
         let task = Task<URL, Error> {
@@ -163,6 +185,14 @@ class AGCaptureManager: NSObject {
             }
         }
     }
+
+    static func resolvedPhotoResult(
+        processingResult: Result<Data, Error>?,
+        captureError: Error?
+    ) -> Result<Data, Error> {
+        if let captureError { return .failure(captureError) }
+        return processingResult ?? .failure(CameraError.captureFailed)
+    }
 }
 
 extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
@@ -173,21 +203,31 @@ extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
         error: Error?
     ) {
         let imageData = photo.fileDataRepresentation()
-        Task { @MainActor in
-            if let error = error {
-                photoCaptureCompletion?(.failure(error))
-                photoCaptureCompletion = nil
-                return
+        DispatchQueue.main.async {
+            if let error {
+                self.photoProcessingResult = .failure(error)
+            } else if let imageData {
+                self.photoProcessingResult = .success(imageData)
+            } else {
+                self.photoProcessingResult = .failure(CameraError.captureFailed)
             }
+        }
+    }
 
-            guard let imageData else {
-                photoCaptureCompletion?(.failure(CameraError.captureFailed))
-                photoCaptureCompletion = nil
-                return
-            }
-
-            photoCaptureCompletion?(.success(imageData))
-            photoCaptureCompletion = nil
+    nonisolated func photoOutput(
+        _ output: AVCapturePhotoOutput,
+        didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings,
+        error: Error?
+    ) {
+        DispatchQueue.main.async {
+            guard let completion = self.photoCaptureCompletion else { return }
+            self.photoCaptureCompletion = nil
+            let result = Self.resolvedPhotoResult(
+                processingResult: self.photoProcessingResult,
+                captureError: error
+            )
+            self.photoProcessingResult = nil
+            completion(result)
         }
     }
 }
@@ -207,7 +247,7 @@ extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
 
             self.startRecordingDurationTracking()
 
-            Self.logger.info("Recording started at: \(fileURL)")
+            self.log.info("Recording started at: \(fileURL)", category: "CaptureManager")
 
             self.videoRecordingStartCompletion?(.success(fileURL))
             self.videoRecordingStartCompletion = nil
@@ -230,7 +270,7 @@ extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
             self.recordingDuration = 0.0
             self.onRecordingStateChanged?(false, 0.0)
 
-            Self.logger.info("Recording stopped. Duration was: \(String(format: "%.1f", finalDuration))s")
+            self.log.info("Recording stopped. Duration was: \(String(format: "%.1f", finalDuration))s", category: "CaptureManager")
 
             if self.videoRecordingStartCompletion != nil {
                 self.videoRecordingStartCompletion?(.failure(error ?? CameraError.recordingFailed))

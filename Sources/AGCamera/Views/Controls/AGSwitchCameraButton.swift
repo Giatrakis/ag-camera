@@ -10,6 +10,10 @@ import SwiftUI
 public struct AGSwitchCameraButton: View {
     var onSwitch: () async -> Void
     @State private var animate = false
+
+    public init(onSwitch: @escaping () async -> Void) {
+        self.onSwitch = onSwitch
+    }
     
     public var body: some View {
         if #available(iOS 26.0, *) {

@@ -10,6 +10,10 @@ import SwiftUI
 public struct AGCapturePhotoButton: View {
     var onCapture: () async -> Void
     @State private var animate = false
+
+    public init(onCapture: @escaping () async -> Void) {
+        self.onCapture = onCapture
+    }
     
     public var body: some View {
         Button {

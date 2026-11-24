@@ -52,6 +52,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		0A6C4D810000000000000001 /* Tests/AGCameraTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Tests/AGCameraTests;
+			sourceTree = "<group>";
+		};
 		FAD35F142EB4E8E9004AF78D /* ag-camera-app */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "ag-camera-app";
@@ -60,11 +65,6 @@
 		FAE0B3D52EBADCB000021FC6 /* Sources */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Sources;
-			sourceTree = "<group>";
-		};
-		0A6C4D810000000000000001 /* AGCameraTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Tests/AGCameraTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -100,7 +100,7 @@
 			isa = PBXGroup;
 			children = (
 				FAE0B3D52EBADCB000021FC6 /* Sources */,
-				0A6C4D810000000000000001 /* AGCameraTests */,
+				0A6C4D810000000000000001 /* Tests/AGCameraTests */,
 				FAD35F142EB4E8E9004AF78D /* ag-camera-app */,
 				FAD35EEE2EB4E2F0004AF78D /* Products */,
 			);
@@ -167,7 +167,7 @@
 				FAD35EFB2EB4E2F0004AF78D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				0A6C4D810000000000000001 /* AGCameraTests */,
+				0A6C4D810000000000000001 /* Tests/AGCameraTests */,
 			);
 			name = "ag-cameraTests";
 			packageProductDependencies = (
@@ -361,7 +361,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -422,7 +422,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;

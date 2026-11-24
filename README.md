@@ -1,6 +1,8 @@
 # AGCamera
 
-AGCamera is a SwiftUI camera package for iOS 26 and later. It provides a ready-to-use camera view and an observable manager for photo capture, video recording, focus, zoom, flash, torch, and camera switching. The SDK is under active development.
+AGCamera is a SwiftUI camera package for iOS 18 and later. It provides a ready-to-use camera view and an observable manager for photo capture, video recording, focus, zoom, flash, torch, and camera switching. The SDK is under active development.
+
+Licensed under the [MIT License](LICENSE).
 
 ## Add the package
 
@@ -11,7 +13,7 @@ Add these usage descriptions to the **host app** as needed:
 | Info.plist key | Required for |
 | --- | --- |
 | `NSCameraUsageDescription` | Camera preview and photo/video capture |
-| `NSMicrophoneUsageDescription` | Video recording with audio |
+| `NSMicrophoneUsageDescription` | Every video recording; AGCamera requires audio and does not record silent video |
 | `NSPhotoLibraryAddUsageDescription` | Saving media to the photo library |
 
 ## Quick start
@@ -35,7 +37,7 @@ struct CameraScreen: View {
 }
 ```
 
-`AGCameraView` requests camera access when permission handling is enabled. Recording requests microphone access when needed, and the explicit save methods request photo library add access when needed. The camera requires a physical device for capture validation.
+`AGCameraView` requests camera access when permission handling is enabled. Every video recording requests microphone access and requires the host app's `NSMicrophoneUsageDescription`; recording fails if access is denied or the audio input cannot be configured. The explicit save methods request photo library add access when needed. The camera requires a physical device for capture validation.
 
 See [USAGE.md](USAGE.md) for configuration, custom controls, and the manager API.
 

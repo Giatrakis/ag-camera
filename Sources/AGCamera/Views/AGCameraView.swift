@@ -1,11 +1,9 @@
 import SwiftUI
 import AVFoundation
-import OSLog
 
 public struct AGCameraView: View {
-    private static let logger = Logger(subsystem: "com.agcamera", category: "CameraView")
     @Bindable var manager: AGCameraManager
-    var configuration: AGCameraConfiguration
+    var configurationOverrides: [(inout AGCameraConfiguration) -> Void] = []
     var photoCaptureAction: ((UIImage) -> Void)?
     var videoStartedAction: ((URL) -> Void)?
     var videoStoppedAction: ((URL) -> Void)?
@@ -19,16 +17,26 @@ public struct AGCameraView: View {
     @State private var focusPoint: CGPoint?
     @State private var showFocusIndicator = false
     @State private var focusTask: Task<Void, Never>?
+    @State private var zoomTask: Task<Void, Never>?
 
     @Environment(\.scenePhase) private var scenePhase
 
+    var configuration: AGCameraConfiguration {
+        var result = manager.configuration
+        for apply in configurationOverrides { apply(&result) }
+        return result
+    }
+
+    private var displayedConfiguration: AGCameraConfiguration {
+        configuration
+    }
+
     public init(manager: AGCameraManager) {
         self.manager = manager
-        self.configuration = manager.configuration
     }
 
     private var tapToFocusHandler: ((CGPoint, CGPoint) -> Void)? {
-        guard configuration.enableTapToFocus else { return nil }
+        guard displayedConfiguration.tapToFocusBehavior != .none else { return nil }
         return { location, devicePoint in
             handleTapToFocus(at: location, devicePoint: devicePoint)
         }
@@ -38,19 +46,19 @@ public struct AGCameraView: View {
         ZStack {
             cameraPreview
 
-            if configuration.showDefaultControls {
+            if displayedConfiguration.showDefaultControls {
                 VStack(spacing: 0) {
                     topControlsView
                     Spacer()
                     bottomControlsView
                 }
+                .disabled(manager.isSwitchingCamera)
             }
         }
         .ignoresSafeArea(edges: .bottom)
         .onChange(of: manager.capturedImage) { _, newValue in
             if let image = newValue {
                 photoCaptureAction?(image)
-                manager.capturedImage = nil
             }
         }
         .onChange(of: manager.lastStartedVideoURL) { oldValue, newValue in
@@ -77,9 +85,12 @@ public struct AGCameraView: View {
             }
         }
         .task {
-            manager.configuration = configuration
-            manager.setFlashMode(configuration.defaultFlashMode)
-            if configuration.handlePermissions {
+            let initialConfiguration = configuration
+            manager.configuration = initialConfiguration
+            manager.setLoggingEnabled(initialConfiguration.enableLogging)
+            manager.setFlashMode(initialConfiguration.defaultFlashMode)
+            manager.setViewActive(scenePhase == .active)
+            if initialConfiguration.handlePermissions {
                 guard await manager.permissionManager.requestCameraPermission() else {
                     present(CameraError.permissionDenied)
                     return
@@ -89,7 +100,9 @@ public struct AGCameraView: View {
             await setupCamera()
         }
         .onDisappear {
-            manager.stopSession()
+            zoomTask?.cancel()
+            focusTask?.cancel()
+            manager.handleAppBackground()
         }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
@@ -113,29 +126,45 @@ public struct AGCameraView: View {
     private var cameraPreview: some View {
         AGCameraPreview(
             session: manager.getCaptureSession(),
-            videoGravity: configuration.videoGravity,
+            isSessionConfigured: manager.isSessionConfigured,
+            isSessionRunning: manager.isSessionRunning,
+            videoGravity: displayedConfiguration.videoGravity,
             cameraPosition: manager.currentCameraPosition,
+            mirrorFrontCamera: displayedConfiguration.mirrorFrontCamera,
+            log: manager.log,
+            loggingEnabled: displayedConfiguration.enableLogging,
             onTapToFocus: tapToFocusHandler
         )
         .ignoresSafeArea()
         .gesture(
             MagnifyGesture()
                 .onChanged { value in
-                    try? manager.updateZoomInteractively(scale: value.magnification, isGestureEnded: false)
+                    zoomTask?.cancel()
+                    zoomTask = Task {
+                        try? await manager.updateZoomInteractively(scale: value.magnification, isGestureEnded: false)
+                    }
                 }
                 .onEnded { value in
-                    try? manager.updateZoomInteractively(scale: value.magnification, isGestureEnded: true)
+                    zoomTask?.cancel()
+                    zoomTask = Task {
+                        try? await manager.updateZoomInteractively(scale: value.magnification, isGestureEnded: true)
+                    }
                 }
         )
         .overlay { transitionSnapshotOverlay }
-        .blur(radius: manager.isBlurred ? 50 : 0)
+        .overlay {
+            Color.black
+                .opacity(manager.isSwitchingCamera ? 1 : 0)
+                .allowsHitTesting(false)
+        }
+        .overlay { AGCameraGridOverlay(grid: displayedConfiguration.grid) }
         .overlay { focusIndicatorOverlay }
     }
 
     @ViewBuilder
     private var focusIndicatorOverlay: some View {
         if showFocusIndicator, let point = focusPoint {
-            configuration.focusIndicator
+            displayedConfiguration.focusIndicator
                 .position(point)
                 .allowsHitTesting(false)
         }
@@ -174,15 +203,6 @@ private extension AGCameraView {
                 Spacer()
             }
 
-            Button {
-                try? manager.setSessionPreset(.hd4K3840x2160)
-            } label: {
-                Image(systemName: "gear")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .padding(12)
-                    .background(Circle().fill(Color.black.opacity(0.5)))
-            }
         }
         .padding()
     }
@@ -210,13 +230,16 @@ private extension AGCameraView {
     
     private var zoomButton: some View {
         AGSZoomControlView(manager: manager) { newZoomLevel in
-            do {
-                try manager.setZoom(factor: newZoomLevel)
-            } catch {
-                Self.logger.error("Zoom error: \(error.localizedDescription)")
-                present(error)
+            Task {
+                do {
+                    try await manager.setZoom(factor: newZoomLevel)
+                } catch {
+                    manager.log.error("Zoom error: \(error.localizedDescription)", category: "CameraView")
+                    present(error)
+                }
             }
         }
+        .disabled(!manager.isSessionRunning)
     }
     
     private var capturePhotoButton: some View {
@@ -251,6 +274,8 @@ private extension AGCameraView {
                 present(error)
             }
         }
+        .disabled(!manager.isSessionRunning)
+        .opacity(manager.isSessionRunning ? 1 : 0)
     }
 }
 
@@ -260,9 +285,8 @@ private extension AGCameraView {
         do {
             try await manager.setupSession()
             guard !Task.isCancelled else { return }
-            manager.startSession()
-
-            Self.logger.info("Camera Info - Min Zoom: \(String(format: "%.1f", manager.minZoomFactor))×, Max Zoom: \(String(format: "%.1f", manager.maxZoomFactor))×, Current Zoom: \(String(format: "%.1f", manager.currentZoomFactor))×")
+            manager.log.info("Camera Info - Min Zoom: \(String(format: "%.1f", manager.minZoomFactor))×, Max Zoom: \(String(format: "%.1f", manager.maxZoomFactor))×, Current Zoom: \(String(format: "%.1f", manager.currentZoomFactor))×", category: "CameraView")
+            manager.startSessionIfViewActive()
         } catch {
             present(error)
         }
@@ -270,21 +294,26 @@ private extension AGCameraView {
 
     private func handleTapToFocus(at location: CGPoint, devicePoint: CGPoint) {
         focusTask?.cancel()
-
-        focusPoint = location
-        showFocusIndicator = true
-
-        do {
-            try manager.setFocusAndExposure(at: devicePoint)
-        } catch {
-            present(error)
-        }
-
-        focusTask = Task {
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            guard !Task.isCancelled else { return }
-            withAnimation {
-                showFocusIndicator = false
+        let behavior = displayedConfiguration.tapToFocusBehavior
+        Task {
+            do {
+                switch behavior {
+                case .none:
+                    return
+                case .focusOnly:
+                    try await manager.setFocus(at: devicePoint)
+                case .focusAndExposure:
+                    try await manager.setFocusAndExposure(at: devicePoint)
+                }
+                focusPoint = location
+                showFocusIndicator = true
+                focusTask = Task {
+                    try? await Task.sleep(for: .seconds(1))
+                    guard !Task.isCancelled else { return }
+                    withAnimation { showFocusIndicator = false }
+                }
+            } catch {
+                present(error)
             }
         }
     }

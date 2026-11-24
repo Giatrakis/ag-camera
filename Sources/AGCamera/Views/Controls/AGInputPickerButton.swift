@@ -10,6 +10,10 @@ import SwiftUI
 public struct AGInputPickerButton: View {
     @Binding var outputType: AGOutputType
     @State private var animate = false
+
+    public init(outputType: Binding<AGOutputType>) {
+        self._outputType = outputType
+    }
     
     public var body: some View {
         if #available(iOS 26.0, *) {

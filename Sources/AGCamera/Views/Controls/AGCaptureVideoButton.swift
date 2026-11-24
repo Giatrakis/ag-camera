@@ -11,6 +11,11 @@ public struct AGCaptureVideoButton: View {
     let isRecording: Bool
     var onCapture: () async -> Void
     @State private var animate = false
+
+    public init(isRecording: Bool, onCapture: @escaping () async -> Void) {
+        self.isRecording = isRecording
+        self.onCapture = onCapture
+    }
     
     public var body: some View {
         Button {
