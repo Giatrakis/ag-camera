@@ -6,7 +6,7 @@ AGCamera is a SwiftUI package for iOS 18 and later. The current SDK exposes `AGC
 
 Add this repository as a Swift package dependency in Xcode, then link the `AGCamera` product to the host app. The package uses Swift 5 language mode and a Swift 6.0 or newer toolchain.
 
-The host app must define `NSCameraUsageDescription` for preview and capture. Video recording always requires audio, so any app that records video must also define `NSMicrophoneUsageDescription`. Define `NSPhotoLibraryAddUsageDescription` when saving media to Photos. These keys belong in the host app's Info.plist, not in the Swift package.
+The host app must define `NSCameraUsageDescription` for preview and capture. Video recording and Live Photos include audio, so apps using either feature must also define `NSMicrophoneUsageDescription`. Define `NSPhotoLibraryAddUsageDescription` when saving media to Photos. These keys belong in the host app's Info.plist, not in the Swift package.
 
 ## Ready-to-use view
 
@@ -31,7 +31,7 @@ struct CameraScreen: View {
 
 `AGCameraView` requests camera permission by default, configures the capture session, starts it while the view is visible, and stops it when the view disappears. It does not automatically save captures to Photos. The URL returned for a video is in the temporary directory; move it or save it before relying on long-term retention.
 
-The demo app has a settings button above the preview. It exposes grid, tap behavior, mirroring, zoom, focus and exposure defaults, photo quality, session preset, video frame rate and codec, torch power, and logging. Tap **Apply** to create a new camera manager and session with those initial settings. The torch button beside Settings tests the chosen power level.
+The demo app has a settings button above the preview. It exposes grid, tap behavior, mirroring, zoom, focus and exposure defaults, photo quality, Live Photo mode, session preset, video frame rate and codec, torch power, and logging. Tap **Apply** to create a new camera manager and session with those initial settings. The torch button beside Settings tests the chosen power level.
 
 Initial options can be supplied when creating the manager:
 
@@ -48,6 +48,7 @@ let configuration = AGCameraConfiguration(
     defaultFocusMode: .continuousAutoFocus,
     defaultExposureMode: .continuousAutoExposure,
     photoQualityPrioritization: .balanced,
+    livePhotoMode: .auto,
     sessionPreset: .hd1920x1080,
     videoFrameRate: 30,
     videoCodec: .hevc,
@@ -56,7 +57,7 @@ let configuration = AGCameraConfiguration(
 let camera = AGCameraManager(configuration: configuration)
 ```
 
-The view also exposes fluent modifiers for these settings, plus `.tapToFocusBehavior(.focusOnly)` and `.grid(.rule3x3)`. Tap behavior is `.none`, `.focusOnly`, or `.focusAndExposure`; `.enableTapToFocus(false)` disables taps. With `.focusAndExposure`, tapping the preview shows a sun beside the focus indicator. Drag up or down on the preview while it is visible to brighten or darken the image. Tapping a new point resets the adjustment to neutral 0 EV. The adjustment is exposure target bias, clamped to the selected camera's supported EV range. Grid options are `.none`, `.rule3x3`, and `.square4x4`. Configuration modifiers are initial-only overrides applied before the first session setup; they are not a way to reconfigure an active session. `.exposureBias(_:)` is a live binding modifier for custom controls. Unmodified options continue to use the manager's latest configuration at setup time. Use manager methods for other live changes. To manage camera permission yourself, use `.handlePermissions(false)` and authorize through `camera.permissionManager` first.
+The view also exposes fluent modifiers for these settings, plus `.tapToFocusBehavior(.focusOnly)`, `.grid(.rule3x3)`, and `.livePhotoMode(.auto)`. Tap behavior is `.none`, `.focusOnly`, or `.focusAndExposure`; `.enableTapToFocus(false)` disables taps. With `.focusAndExposure`, tapping the preview shows a sun beside the focus indicator. Drag up or down on the preview while it is visible to brighten or darken the image. Tapping a new point resets the adjustment to neutral 0 EV. The adjustment is exposure target bias, clamped to the selected camera's supported EV range. Grid options are `.none`, `.rule3x3`, and `.square4x4`. Configuration modifiers are initial-only overrides applied before the first session setup; they are not a way to reconfigure an active session. `.exposureBias(_:)` is a live binding modifier for custom controls. Unmodified options continue to use the manager's latest configuration at setup time. Use manager methods for other live changes. To manage camera permission yourself, use `.handlePermissions(false)` and authorize through `camera.permissionManager` first.
 
 Photo quality accepts `.speed`, `.balanced`, or `.quality`. The session preset accepts any `AVCaptureSession.Preset` supported by the current camera, including `.photo`, `.high`, `.hd1920x1080`, and `.hd4K3840x2160`. Frame rate is an integer such as 24, 30, or 60 fps; the selected camera format must support it. For video codec, use `.h264`, `.hevc`, or `nil` to leave the system default. Recordings use a `.mov` container regardless of codec. Unsupported preset, frame rate, or codec selections report `CameraError.invalidConfiguration` when applied.
 
@@ -64,7 +65,7 @@ The front camera is mirrored by default in the preview and captured media. Set `
 
 ## Permissions
 
-Camera access is required for preview and capture. The view requests it during setup when permission handling is enabled. Starting any video recording requests microphone access; recording fails when access is denied or an audio input cannot be configured. Photo capture remains available without microphone access. Saving media requests photo library add access when needed; denial prevents saving to Photos but does not prevent capture.
+Camera access is required for preview and capture. The view requests it during setup when permission handling is enabled. Starting any video recording or enabling Live Photos requests microphone access. Live Photo On fails without microphone access; Auto falls back to a still photo. Still photo capture remains available without microphone access. Saving media requests photo library add access when needed; denial prevents saving to Photos but does not prevent capture.
 
 ```swift
 let camera = AGCameraManager()
@@ -165,10 +166,14 @@ Configure an `AVCaptureVideoDataOutput` and its sample buffer delegate before ca
 
 ## Capture results and saving
 
-`capturePhoto()` returns encoded image `Data`. `startVideoRecording()` returns the temporary movie URL after recording starts. `stopVideoRecording()` returns the completed movie URL. Both video methods are asynchronous and throwing.
+`capturePhoto()` always returns still-image `Data`. `captureSelectedPhoto()` uses the current Live Photo mode and returns `.still(Data)` or `.live(AGLivePhotoCapture)`. `captureLivePhoto()` explicitly returns a still image and paired movie when the mode is On or Auto and Live capture is available. `startVideoRecording()` returns the temporary movie URL after recording starts. `stopVideoRecording()` returns the completed movie URL. These capture methods are asynchronous and throwing.
 
 ```swift
 let photoData = try await camera.capturePhoto()
+
+try await camera.setLivePhotoMode(.on)
+let liveCapture = try await camera.captureLivePhoto()
+try await camera.saveLivePhotoToLibrary(liveCapture)
 
 let recordingURL = try await camera.startVideoRecording()
 let completedURL = try await camera.stopVideoRecording()
@@ -178,6 +183,8 @@ try await camera.saveVideoToLibrary(url: completedURL)
 ```
 
 The start URL and completed URL refer to the recording file. `saveVideoToLibrary(url:)` removes the temporary file after a successful save. The manager does not save photos or videos automatically.
+
+Live Photo mode defaults to Off. The built-in photo button uses Off, On, or Auto. Auto tries a Live Photo when the current device, format, microphone authorization, and session support it; otherwise it captures a still photo. AVFoundation does not expose the system Camera app's Auto decision, so the SDK's Auto policy is support-based rather than scene-based. `setLivePhotoMode(_:)` changes mode while the view is running; first-time activation may briefly reconfigure the preview. `isLivePhotoSupported` and `isLivePhotoAvailable` describe the active camera. `.onLivePhotoCapture` delivers paired results, and `AGLivePhotoView(capture:)` displays them with the system Live Photo interaction. A Live Photo result owns a temporary paired movie; save it, move it, or remove it when no longer needed.
 
 Video and audio sample outputs and the microphone input are prepared when recording first starts, so the first recording can take longer to begin than later recordings. `switchCamera()` can be called while recording. Audio remains in the same movie file; video may briefly hold the last frame while the camera input changes. Recording does not stop or create separate clips during a switch. Microphone gaps during a switch are filled with silence to preserve audio/video timing. The movie currently stores uncompressed PCM audio, which can increase file size compared with AAC.
 
@@ -201,4 +208,4 @@ try await camera.setSessionPreset(.hd1920x1080)
 
 ## Current scope
 
-The SDK currently supports still photos, video recording, a SwiftUI preview with built-in controls, and direct camera settings. It does not provide a media browser, capture format picker, editing pipeline, or automatic persistence. `AGCameraView` displays camera errors in an alert; the host app owns saved media.
+The SDK currently supports still photos, Live Photos, video recording, a SwiftUI preview with built-in controls, and direct camera settings. It does not provide a media browser, capture format picker, editing pipeline, or automatic persistence. `AGCameraView` displays camera errors in an alert; the host app owns saved media.

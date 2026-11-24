@@ -555,7 +555,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to take photos and record videos";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to record videos with audio";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to record videos and Live Photos with audio";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos and videos to your library";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -590,7 +590,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to take photos and record videos";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to record videos with audio";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to record videos and Live Photos with audio";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos and videos to your library";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

@@ -14,6 +14,12 @@ extension AGCameraView {
         return view
     }
 
+    public func onLivePhotoCapture(_ action: @escaping (AGLivePhotoCapture) -> Void) -> Self {
+        var view = self
+        view.livePhotoCaptureAction = action
+        return view
+    }
+
     public func onVideoStarted(_ action: @escaping (URL) -> Void) -> Self {
         var view = self
         view.videoStartedAction = action
@@ -114,6 +120,10 @@ extension AGCameraView {
 
     public func photoQuality(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) -> Self {
         overriding(\.photoQualityPrioritization, with: prioritization)
+    }
+
+    public func livePhotoMode(_ mode: AGLivePhotoMode) -> Self {
+        overriding(\.livePhotoMode, with: mode)
     }
 
     public func sessionPreset(_ preset: AVCaptureSession.Preset) -> Self {

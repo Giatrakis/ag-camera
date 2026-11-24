@@ -126,6 +126,32 @@ struct AGCameraViewConfigurationTests {
     }
 
     @Test
+    func livePhotoResultRequiresACompletedStillAndMovie() {
+        let photoData = Data([1, 2, 3])
+        let movieURL = URL(fileURLWithPath: "/tmp/live-photo-test.mov")
+        let complete = AGCaptureManager.resolvedLivePhotoResult(
+            photoResult: .success(photoData),
+            movieResult: .success(movieURL)
+        )
+        if case .success(let capture) = complete {
+            #expect(capture.photoData == photoData)
+            #expect(capture.pairedVideoURL == movieURL)
+        } else {
+            Issue.record("A completed Live Photo must contain both resources")
+        }
+
+        let incomplete = AGCaptureManager.resolvedLivePhotoResult(
+            photoResult: .success(photoData),
+            movieResult: nil
+        )
+        if case .failure(let error as CameraError) = incomplete {
+            #expect(error == .captureFailed)
+        } else {
+            Issue.record("A missing paired movie must fail the capture")
+        }
+    }
+
+    @Test
     func loggingCanBeDisabledForOneCameraInstance() {
         let quietCamera = AGCameraManager(configuration: .init(enableLogging: false))
         let otherCamera = AGCameraManager()

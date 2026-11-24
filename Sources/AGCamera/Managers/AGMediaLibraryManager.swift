@@ -29,6 +29,20 @@ class AGMediaLibraryManager {
         }
     }
 
+    func saveLivePhotoToLibrary(_ capture: AGLivePhotoCapture) async throws {
+        guard await permissionManager.requestPhotoLibraryPermission() else {
+            throw CameraError.permissionDenied
+        }
+
+        try await PHPhotoLibrary.shared().performChanges {
+            let request = PHAssetCreationRequest.forAsset()
+            request.addResource(with: .photo, data: capture.photoData, options: nil)
+            let options = PHAssetResourceCreationOptions()
+            options.shouldMoveFile = true
+            request.addResource(with: .pairedVideo, fileURL: capture.pairedVideoURL, options: options)
+        }
+    }
+
     func saveVideoToLibrary(url: URL) async throws {
         guard await permissionManager.requestPhotoLibraryPermission() else {
             throw CameraError.permissionDenied

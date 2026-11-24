@@ -102,6 +102,11 @@ struct CameraSettingsView: View {
                 Text("Balanced").tag(AVCapturePhotoOutput.QualityPrioritization.balanced)
                 Text("Quality").tag(AVCapturePhotoOutput.QualityPrioritization.quality)
             }
+            Picker("Live Photo", selection: $draft.livePhotoMode) {
+                Text("Off").tag(AGLivePhotoMode.off)
+                Text("On").tag(AGLivePhotoMode.on)
+                Text("Auto").tag(AGLivePhotoMode.auto)
+            }
             Picker("Session preset", selection: $draft.sessionPreset) {
                 Text("Photo").tag(AVCaptureSession.Preset.photo)
                 Text("High").tag(AVCaptureSession.Preset.high)

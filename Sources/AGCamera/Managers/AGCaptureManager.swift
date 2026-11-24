@@ -11,9 +11,12 @@ class AGCaptureManager: NSObject {
     private let sessionManager: AGSessionManager
     private let log: AGCameraLog
     private let videoRecorder: AGVideoRecordingWriter
-    private var photoCaptureCompletion: ((Result<Data, Error>) -> Void)?
+    private var photoCaptureCompletion: ((Result<AGPhotoCaptureResult, Error>) -> Void)?
     private var photoProcessingResult: Result<Data, Error>?
-    private var photoCaptureTask: Task<Data, Error>?
+    private var livePhotoMovieResult: Result<URL, Error>?
+    private var pendingLivePhotoURL: URL?
+    private var photoCaptureTask: Task<AGPhotoCaptureResult, Error>?
+    private var isLivePhotoCapture = false
     private var videoRecordingStartTask: Task<URL, Error>?
     private var videoRecordingStopTask: Task<URL, Error>?
 
@@ -30,6 +33,7 @@ class AGCaptureManager: NSObject {
     var onRecordingStateChanged: ((Bool, TimeInterval) -> Void)?
     var recordingVideoOutput: AVCaptureVideoDataOutput { videoRecorder.videoOutput }
     var recordingAudioOutput: AVCaptureAudioDataOutput { videoRecorder.audioOutput }
+    var isCapturingPhoto: Bool { photoCaptureTask != nil }
 
     init(sessionManager: AGSessionManager, log: AGCameraLog) {
         self.sessionManager = sessionManager
@@ -39,24 +43,49 @@ class AGCaptureManager: NSObject {
     }
 
     func capturePhoto() async throws -> Data {
+        let result = try await capturePhoto(live: false)
+        guard case .still(let data) = result else { throw CameraError.captureFailed }
+        return data
+    }
+
+    func captureLivePhoto() async throws -> AGLivePhotoCapture {
+        let result = try await capturePhoto(live: true)
+        guard case .live(let capture) = result else { throw CameraError.captureFailed }
+        return capture
+    }
+
+    private func capturePhoto(live: Bool) async throws -> AGPhotoCaptureResult {
         guard let photoOutput = sessionManager.photoOutput else {
             throw CameraError.captureFailed
         }
 
-        // If capture already in progress, return the existing task result
         if let existingTask = photoCaptureTask {
+            guard isLivePhotoCapture == live else { throw CameraError.captureFailed }
             return try await existingTask.value
         }
+        if live {
+            guard sessionManager.livePhotoState.isEnabled else { throw CameraError.livePhotoUnavailable }
+        }
 
-        let task = Task<Data, Error> {
+        let task = Task<AGPhotoCaptureResult, Error> {
             try await withCheckedThrowingContinuation { continuation in
                 self.photoCaptureCompletion = { result in
                     continuation.resume(with: result)
                 }
                 self.photoProcessingResult = nil
+                self.livePhotoMovieResult = nil
 
                 let photoSettings = AVCapturePhotoSettings()
                 photoSettings.photoQualityPrioritization = photoQualityPrioritization
+                if live {
+                    let movieURL = FileManager.default.temporaryDirectory
+                        .appendingPathComponent(UUID().uuidString)
+                        .appendingPathExtension("mov")
+                    self.pendingLivePhotoURL = movieURL
+                    photoSettings.livePhotoMovieFileURL = movieURL
+                } else {
+                    self.pendingLivePhotoURL = nil
+                }
 
                 if photoOutput.supportedFlashModes.contains(flashMode) {
                     photoSettings.flashMode = flashMode
@@ -67,15 +96,13 @@ class AGCaptureManager: NSObject {
         }
 
         photoCaptureTask = task
+        isLivePhotoCapture = live
 
-        do {
-            let result = try await task.value
+        defer {
             photoCaptureTask = nil
-            return result
-        } catch {
-            photoCaptureTask = nil
-            throw error
+            isLivePhotoCapture = false
         }
+        return try await task.value
     }
 
     func startVideoRecording() async throws -> URL {
@@ -167,6 +194,22 @@ class AGCaptureManager: NSObject {
         if let captureError { return .failure(captureError) }
         return processingResult ?? .failure(CameraError.captureFailed)
     }
+
+    static func resolvedLivePhotoResult(
+        photoResult: Result<Data, Error>,
+        movieResult: Result<URL, Error>?
+    ) -> Result<AGLivePhotoCapture, Error> {
+        switch (photoResult, movieResult) {
+        case (.success(let data), .some(.success(let movieURL))):
+            return .success(AGLivePhotoCapture(photoData: data, pairedVideoURL: movieURL))
+        case (.failure(let error), _):
+            return .failure(error)
+        case (_, .some(.failure(let error))):
+            return .failure(error)
+        default:
+            return .failure(CameraError.captureFailed)
+        }
+    }
 }
 
 extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
@@ -190,17 +233,44 @@ extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
 
     nonisolated func photoOutput(
         _ output: AVCapturePhotoOutput,
+        didFinishProcessingLivePhotoToMovieFileAt outputFileURL: URL,
+        duration: CMTime,
+        photoDisplayTime: CMTime,
+        resolvedSettings: AVCaptureResolvedPhotoSettings,
+        error: Error?
+    ) {
+        DispatchQueue.main.async {
+            self.livePhotoMovieResult = error.map { .failure($0) } ?? .success(outputFileURL)
+        }
+    }
+
+    nonisolated func photoOutput(
+        _ output: AVCapturePhotoOutput,
         didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings,
         error: Error?
     ) {
         DispatchQueue.main.async {
             guard let completion = self.photoCaptureCompletion else { return }
             self.photoCaptureCompletion = nil
-            let result = Self.resolvedPhotoResult(
+            let photoResult = Self.resolvedPhotoResult(
                 processingResult: self.photoProcessingResult,
                 captureError: error
             )
+            let result: Result<AGPhotoCaptureResult, Error>
+            if self.isLivePhotoCapture {
+                result = Self.resolvedLivePhotoResult(
+                    photoResult: photoResult,
+                    movieResult: self.livePhotoMovieResult
+                ).map(AGPhotoCaptureResult.live)
+            } else {
+                result = photoResult.map(AGPhotoCaptureResult.still)
+            }
+            if case .failure = result, let movieURL = self.pendingLivePhotoURL {
+                try? FileManager.default.removeItem(at: movieURL)
+            }
             self.photoProcessingResult = nil
+            self.livePhotoMovieResult = nil
+            self.pendingLivePhotoURL = nil
             completion(result)
         }
     }

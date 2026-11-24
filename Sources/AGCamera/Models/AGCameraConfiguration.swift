@@ -27,6 +27,7 @@ public struct AGCameraConfiguration {
     public var defaultFocusMode: AVCaptureDevice.FocusMode
     public var defaultExposureMode: AVCaptureDevice.ExposureMode
     public var photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization
+    public var livePhotoMode: AGLivePhotoMode
     public var sessionPreset: AVCaptureSession.Preset
     public var videoFrameRate: Int32
     public var videoCodec: AVVideoCodecType?
@@ -50,6 +51,7 @@ public struct AGCameraConfiguration {
         defaultFocusMode: AVCaptureDevice.FocusMode = .continuousAutoFocus,
         defaultExposureMode: AVCaptureDevice.ExposureMode = .continuousAutoExposure,
         photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization = .quality,
+        livePhotoMode: AGLivePhotoMode = .off,
         sessionPreset: AVCaptureSession.Preset = .photo,
         videoFrameRate: Int32 = 30,
         videoCodec: AVVideoCodecType? = nil,
@@ -71,6 +73,7 @@ public struct AGCameraConfiguration {
         self.defaultFocusMode = defaultFocusMode
         self.defaultExposureMode = defaultExposureMode
         self.photoQualityPrioritization = photoQualityPrioritization
+        self.livePhotoMode = livePhotoMode
         self.sessionPreset = sessionPreset
         self.videoFrameRate = videoFrameRate
         self.videoCodec = videoCodec

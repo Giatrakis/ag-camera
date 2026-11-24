@@ -7,6 +7,11 @@ struct AGZoomState: Sendable {
     let didApplyDeviceSettings: Bool
 }
 
+struct AGLivePhotoState: Sendable {
+    let isSupported: Bool
+    let isEnabled: Bool
+}
+
 // The caller configures the output before registration; only this queue changes its session membership.
 // Remove this wrapper when AVFoundation output types become Sendable.
 private struct QueuedVideoDataOutput: @unchecked Sendable {
@@ -29,6 +34,7 @@ final class AGSessionManager {
     var videoDeviceInput: AVCaptureDeviceInput? { worker.videoDeviceInput }
     var audioDeviceInput: AVCaptureDeviceInput? { worker.audioDeviceInput }
     var photoOutput: AVCapturePhotoOutput? { worker.photoOutput }
+    var livePhotoState: AGLivePhotoState { worker.livePhotoState }
     var currentDevice: AVCaptureDevice? { worker.currentDevice }
     var currentPosition: AVCaptureDevice.Position { worker.currentPosition }
     var isConfigured: Bool { worker.isConfigured }
@@ -44,15 +50,24 @@ final class AGSessionManager {
         worker.stopSession { _ in }
     }
 
-    func setupSession(for position: AVCaptureDevice.Position, preset: AVCaptureSession.Preset = .photo) async throws {
+    func setupSession(
+        for position: AVCaptureDevice.Position,
+        preset: AVCaptureSession.Preset = .photo,
+        prepareLivePhoto: Bool = false
+    ) async throws {
         guard permissionManager.isCameraAuthorized else {
             throw CameraError.permissionDenied
         }
 
         try await worker.setupSession(
             for: position,
-            preset: preset
+            preset: preset,
+            prepareLivePhoto: prepareLivePhoto
         )
+    }
+
+    func configureLivePhotoCapture(enabled: Bool, keepAudioInput: Bool) async throws -> AGLivePhotoState {
+        try await worker.configureLivePhotoCapture(enabled: enabled, keepAudioInput: keepAudioInput)
     }
 
     func prepareVideoRecording(
@@ -164,6 +179,7 @@ private final class CameraSessionWorker: @unchecked Sendable {
     var videoDeviceInput: AVCaptureDeviceInput? { queue.sync { storedVideoDeviceInput } }
     var audioDeviceInput: AVCaptureDeviceInput? { queue.sync { storedAudioDeviceInput } }
     var photoOutput: AVCapturePhotoOutput? { queue.sync { storedPhotoOutput } }
+    var livePhotoState: AGLivePhotoState { queue.sync { livePhotoStateOnQueue() } }
     var currentDevice: AVCaptureDevice? { queue.sync { storedCurrentDevice } }
     var currentPosition: AVCaptureDevice.Position { queue.sync { storedCurrentPosition } }
     var isConfigured: Bool { queue.sync { storedIsConfigured } }
@@ -181,7 +197,8 @@ private final class CameraSessionWorker: @unchecked Sendable {
 
     func setupSession(
         for position: AVCaptureDevice.Position,
-        preset: AVCaptureSession.Preset
+        preset: AVCaptureSession.Preset,
+        prepareLivePhoto: Bool
     ) async throws {
         try await withCheckedThrowingContinuation { continuation in
             queue.async {
@@ -207,7 +224,17 @@ private final class CameraSessionWorker: @unchecked Sendable {
                     }
                     self.captureSession.sessionPreset = preset
                     try self.replaceVideoInput(for: position)
+                    if prepareLivePhoto {
+                        try self.setupAudioInput()
+                    }
                     try self.setupPhotoOutput()
+                    if prepareLivePhoto, let output = self.storedPhotoOutput,
+                       output.isLivePhotoCaptureSupported {
+                        output.isLivePhotoCaptureEnabled = true
+                    } else if prepareLivePhoto, let input = self.storedAudioDeviceInput {
+                        self.captureSession.removeInput(input)
+                        self.storedAudioDeviceInput = nil
+                    }
 
                     self.storedCurrentPosition = position
                     self.storedIsConfigured = true
@@ -298,6 +325,62 @@ private final class CameraSessionWorker: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    func configureLivePhotoCapture(enabled: Bool, keepAudioInput: Bool) async throws -> AGLivePhotoState {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<AGLivePhotoState, Error>) in
+            queue.async {
+                guard self.storedIsConfigured, let output = self.storedPhotoOutput else {
+                    continuation.resume(throwing: CameraError.setupFailed)
+                    return
+                }
+                self.captureSession.beginConfiguration()
+                let hadAudioInput = self.storedAudioDeviceInput != nil
+                do {
+                    if enabled {
+                        try self.setupAudioInput()
+                        if output.isLivePhotoCaptureSupported {
+                            output.isLivePhotoCaptureEnabled = true
+                            output.isLivePhotoCaptureSuspended = false
+                        } else if !keepAudioInput,
+                                  let input = self.storedAudioDeviceInput {
+                            self.captureSession.removeInput(input)
+                            self.storedAudioDeviceInput = nil
+                        }
+                    } else {
+                        if output.isLivePhotoCaptureEnabled {
+                            output.isLivePhotoCaptureSuspended = true
+                        }
+                        if !keepAudioInput, let input = self.storedAudioDeviceInput {
+                            self.captureSession.removeInput(input)
+                            self.storedAudioDeviceInput = nil
+                        }
+                    }
+                    self.captureSession.commitConfiguration()
+                    continuation.resume(returning: self.livePhotoStateOnQueue())
+                } catch {
+                    if !hadAudioInput, !keepAudioInput,
+                       let input = self.storedAudioDeviceInput {
+                        self.captureSession.removeInput(input)
+                        self.storedAudioDeviceInput = nil
+                    }
+                    self.captureSession.commitConfiguration()
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func livePhotoStateOnQueue() -> AGLivePhotoState {
+        guard let output = storedPhotoOutput else {
+            return AGLivePhotoState(isSupported: false, isEnabled: false)
+        }
+        return AGLivePhotoState(
+            isSupported: output.isLivePhotoCaptureSupported,
+            isEnabled: output.isLivePhotoCaptureEnabled
+                && !output.isLivePhotoCaptureSuspended
+                && storedAudioDeviceInput != nil
+        )
     }
 
     func startSession(completion: @escaping @Sendable (Bool) -> Void) {

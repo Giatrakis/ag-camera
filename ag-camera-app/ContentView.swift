@@ -22,7 +22,11 @@ struct ContentView: View {
         ZStack(alignment: .topTrailing) {
             AGCameraView(manager: cameraManager)
                 .exposureBias($exposureBias)
-                .onPhotoCapture { presentedSheet = .photo(CapturedPhoto(image: $0)) }
+                .onPhotoCapture { image in
+                    guard let data = cameraManager.lastCapturedPhotoData else { return }
+                    presentedSheet = .photo(CapturedPhoto(image: image, data: data))
+                }
+                .onLivePhotoCapture { presentedSheet = .live($0) }
                 .onVideoStopped { presentedSheet = .video(CapturedVideo(url: $0)) }
                 .id(cameraIdentity)
 
@@ -60,7 +64,9 @@ struct ContentView: View {
             case .settings:
                 CameraSettingsView(configuration: cameraManager.configuration, onApply: applySettings)
             case .photo(let photo):
-                CapturePhotoPreview(photo: photo.image)
+                CapturePhotoPreview(photo: photo, cameraManager: cameraManager)
+            case .live(let capture):
+                CaptureLivePhotoPreview(capture: capture, cameraManager: cameraManager)
             case .video(let video):
                 CaptureVideoPreview(url: video.url)
             }
@@ -94,7 +100,7 @@ struct ContentView: View {
 
             HStack(spacing: 20) {
                 Button {
-                    runCameraAction { _ = try await cameraManager.capturePhoto() }
+                    runCameraAction { _ = try await cameraManager.captureSelectedPhoto() }
                 } label: {
                     Label("Photo", systemImage: "camera")
                 }
@@ -136,6 +142,7 @@ struct ContentView: View {
 private enum PresentedSheet: Identifiable {
     case settings
     case photo(CapturedPhoto)
+    case live(AGLivePhotoCapture)
     case video(CapturedVideo)
 
     var id: String {
@@ -144,6 +151,8 @@ private enum PresentedSheet: Identifiable {
             "settings"
         case .photo(let photo):
             photo.id.uuidString
+        case .live(let capture):
+            capture.pairedVideoURL.absoluteString
         case .video(let video):
             video.id.uuidString
         }
@@ -153,6 +162,7 @@ private enum PresentedSheet: Identifiable {
 private struct CapturedPhoto: Identifiable {
     let id = UUID()
     let image: UIImage
+    let data: Data
 }
 
 private struct CapturedVideo: Identifiable {
@@ -161,24 +171,124 @@ private struct CapturedVideo: Identifiable {
 }
 
 private struct CapturePhotoPreview: View {
-    let photo: UIImage
+    let photo: CapturedPhoto
+    let cameraManager: AGCameraManager
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        Image(uiImage: photo)
-            .resizable()
-            .scaledToFit()
-            .overlay(alignment: .topLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left.circle.fill")
-                        .font(.largeTitle)
-                        .foregroundStyle(.white)
-                        .padding()
+        NavigationStack {
+            Image(uiImage: photo.image)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.black)
+                .safeAreaInset(edge: .bottom) {
+                    CaptureSaveBar {
+                        try await cameraManager.savePhotoToLibrary(photo.data)
+                    }
+                }
+                .navigationTitle("Photo")
+                .toolbarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+        }
+        .presentationDetents([.large])
+    }
+}
+
+private struct CaptureLivePhotoPreview: View {
+    let capture: AGLivePhotoCapture
+    let cameraManager: AGCameraManager
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            AGLivePhotoView(capture: capture)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.black)
+                .accessibilityHint("Press and hold to play the Live Photo")
+                .safeAreaInset(edge: .bottom) {
+                    CaptureSaveBar(instruction: "Press and hold the photo to play") {
+                        try await cameraManager.saveLivePhotoToLibrary(capture)
+                    }
+                }
+                .navigationTitle("Live Photo")
+                .toolbarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+        }
+        .presentationDetents([.large])
+        .onDisappear {
+            try? FileManager.default.removeItem(at: capture.pairedVideoURL)
+        }
+    }
+}
+
+private struct CaptureSaveBar: View {
+    let instruction: String?
+    let save: @MainActor () async throws -> Void
+
+    @State private var isSaving = false
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
+
+    @Environment(\.dismiss) private var dismiss
+
+    init(instruction: String? = nil, save: @escaping @MainActor () async throws -> Void) {
+        self.instruction = instruction
+        self.save = save
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            if let instruction {
+                Label(instruction, systemImage: "livephoto")
+                    .font(.footnote)
+                    .foregroundStyle(.white)
+            }
+
+            Button {
+                Task { await saveToPhotos() }
+            } label: {
+                if isSaving {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label("Save to Photos", systemImage: "square.and.arrow.down")
+                        .frame(maxWidth: .infinity)
                 }
             }
+            .buttonStyle(.borderedProminent)
+            .disabled(isSaving)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(.black.opacity(0.85))
+        .alert("Could Not Save", isPresented: $showSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(saveErrorMessage)
+        }
+    }
+
+    private func saveToPhotos() async {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await save()
+            dismiss()
+        } catch {
+            saveErrorMessage = error.localizedDescription
+            showSaveError = true
+        }
     }
 }
 

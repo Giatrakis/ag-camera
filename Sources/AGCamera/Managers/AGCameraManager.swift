@@ -19,6 +19,9 @@ public class AGCameraManager: NSObject {
     public private(set) var error: CameraError?
     public private(set) var isRecording = false
     public private(set) var isPreparingVideoRecording = false
+    public private(set) var livePhotoMode: AGLivePhotoMode = .off
+    public private(set) var isLivePhotoSupported = false
+    public private(set) var isLivePhotoAvailable = false
     public private(set) var recordingDuration: TimeInterval = 0.0
     public private(set) var currentZoomFactor: CGFloat = 1.0
     public private(set) var lastZoomFactor: CGFloat = 1.0
@@ -38,6 +41,7 @@ public class AGCameraManager: NSObject {
     public private(set) var lastStartedVideoURL: URL?
     public private(set) var lastStoppedVideoURL: URL?
     public var lastCapturedPhotoData: Data?
+    public private(set) var lastCapturedLivePhoto: AGLivePhotoCapture?
 
     // Camera switch animation state
     public var isBlurred: Bool = false
@@ -46,6 +50,7 @@ public class AGCameraManager: NSObject {
 
     // Callback handlers for events
     public var onPhotoCapture: ((UIImage) -> Void)?
+    public var onLivePhotoCapture: ((AGLivePhotoCapture) -> Void)?
     public var onVideoStarted: ((URL) -> Void)?
     public var onVideoStopped: ((URL) -> Void)?
     public var onCameraPositionChanged: ((AVCaptureDevice.Position) -> Void)?
@@ -84,6 +89,7 @@ public class AGCameraManager: NSObject {
         self.configuration = configuration
         self.permissionManager = AGPermissionManager()
         self.currentCameraPosition = configuration.defaultCameraPosition
+        self.livePhotoMode = configuration.livePhotoMode
         let log = AGCameraLog(enabled: configuration.enableLogging)
         self.log = log
 
@@ -157,6 +163,12 @@ public class AGCameraManager: NSObject {
         minExposureBias = state.minimum
         maxExposureBias = state.maximum
     }
+
+    private func refreshLivePhotoState() {
+        let state = sessionManager.livePhotoState
+        isLivePhotoSupported = state.isSupported
+        isLivePhotoAvailable = state.isEnabled && permissionManager.isMicrophoneAuthorized
+    }
 }
 
 // MARK: - Session Management
@@ -187,8 +199,22 @@ extension AGCameraManager {
 
             if !sessionManager.isConfigured {
                 currentCameraPosition = configuration.defaultCameraPosition
-                try await sessionManager.setupSession(for: currentCameraPosition, preset: configuration.sessionPreset)
+                let prepareLivePhoto: Bool
+                if configuration.livePhotoMode == .off {
+                    prepareLivePhoto = false
+                } else if configuration.handlePermissions {
+                    prepareLivePhoto = await permissionManager.requestMicrophonePermission()
+                } else {
+                    prepareLivePhoto = permissionManager.isMicrophoneAuthorized
+                }
+                try await sessionManager.setupSession(
+                    for: currentCameraPosition,
+                    preset: configuration.sessionPreset,
+                    prepareLivePhoto: prepareLivePhoto
+                )
             }
+            livePhotoMode = configuration.livePhotoMode
+            refreshLivePhotoState()
             sessionManager.configureVideoMirroring(
                 for: currentCameraPosition,
                 mirrorFrontCamera: configuration.mirrorFrontCamera
@@ -310,6 +336,79 @@ extension AGCameraManager {
 
         return data
     }
+
+    public func captureLivePhoto() async throws -> AGLivePhotoCapture {
+        guard !isSwitchingCamera else { throw CameraError.cameraSwitchInProgress }
+        guard livePhotoMode != .off else { throw CameraError.livePhotoUnavailable }
+        guard permissionManager.isMicrophoneAuthorized else { throw CameraError.microphonePermissionDenied }
+        guard isLivePhotoAvailable else { throw CameraError.livePhotoUnavailable }
+
+        do {
+            let capture = try await captureManager.captureLivePhoto()
+            lastCapturedLivePhoto = capture
+            onLivePhotoCapture?(capture)
+            return capture
+        } catch {
+            reportError(error, fallback: .captureFailed)
+            throw error
+        }
+    }
+
+    public func captureSelectedPhoto() async throws -> AGPhotoCaptureResult {
+        switch livePhotoMode {
+        case .off:
+            return .still(try await capturePhoto())
+        case .on:
+            return .live(try await captureLivePhoto())
+        case .auto:
+            if isLivePhotoAvailable {
+                return .live(try await captureLivePhoto())
+            }
+            return .still(try await capturePhoto())
+        }
+    }
+}
+
+// MARK: - Live Photos
+
+extension AGCameraManager {
+
+    public func setLivePhotoMode(_ mode: AGLivePhotoMode) async throws {
+        guard !isSwitchingCamera else { throw CameraError.cameraSwitchInProgress }
+        guard !isRecording, !isPreparingVideoRecording, !captureManager.isCapturingPhoto else {
+            throw CameraError.invalidConfiguration
+        }
+        guard isSessionConfigured else {
+            livePhotoMode = mode
+            configuration.livePhotoMode = mode
+            return
+        }
+
+        if mode == .off {
+            _ = try await sessionManager.configureLivePhotoCapture(enabled: false, keepAudioInput: false)
+        } else {
+            let microphoneAllowed = configuration.handlePermissions
+                ? await permissionManager.requestMicrophonePermission()
+                : permissionManager.isMicrophoneAuthorized
+            if microphoneAllowed {
+                let state = try await sessionManager.configureLivePhotoCapture(
+                    enabled: true,
+                    keepAudioInput: false
+                )
+                if mode == .on, !state.isEnabled {
+                    refreshLivePhotoState()
+                    throw CameraError.livePhotoUnavailable
+                }
+            } else if mode == .on {
+                throw CameraError.microphonePermissionDenied
+            } else {
+                _ = try await sessionManager.configureLivePhotoCapture(enabled: false, keepAudioInput: false)
+            }
+        }
+        livePhotoMode = mode
+        configuration.livePhotoMode = mode
+        refreshLivePhotoState()
+    }
 }
 
 // MARK: - Video Recording
@@ -378,6 +477,11 @@ extension AGCameraManager {
             reportError(error, fallback: .recordingFailed)
             throw error
         }
+        _ = try? await sessionManager.configureLivePhotoCapture(
+            enabled: livePhotoMode != .off && permissionManager.isMicrophoneAuthorized,
+            keepAudioInput: false
+        )
+        refreshLivePhotoState()
         lastVideoURL = url
         lastStoppedVideoURL = url
         onVideoStopped?(url)
@@ -448,6 +552,14 @@ extension AGCameraManager {
             }
             refreshZoomState()
             try await refreshExposureBiasState()
+            if livePhotoMode != .off, permissionManager.isMicrophoneAuthorized, !isRecording {
+                do {
+                    _ = try await sessionManager.configureLivePhotoCapture(enabled: true, keepAudioInput: false)
+                } catch {
+                    log.warning("Live Photo setup is unavailable after camera switch", category: "CameraManager")
+                }
+            }
+            refreshLivePhotoState()
             onCameraPositionChanged?(newPosition)
             onZoomChanged?(currentZoomFactor)
             if !zoomState.didApplyDeviceSettings {
@@ -623,6 +735,10 @@ extension AGCameraManager {
         try await qualitySettings.setSessionPreset(preset)
         configuration.sessionPreset = preset
         refreshZoomState()
+        if livePhotoMode != .off, permissionManager.isMicrophoneAuthorized, !isRecording {
+            _ = try? await sessionManager.configureLivePhotoCapture(enabled: true, keepAudioInput: false)
+        }
+        refreshLivePhotoState()
     }
 
     public func setPhotoQualityPrioritization(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) {
@@ -668,6 +784,10 @@ extension AGCameraManager {
         try await mediaLibrary.savePhotoToLibrary(data)
     }
 
+    public func saveLivePhotoToLibrary(_ capture: AGLivePhotoCapture) async throws {
+        try await mediaLibrary.saveLivePhotoToLibrary(capture)
+    }
+
     public func saveVideoToLibrary(url: URL) async throws {
         try await mediaLibrary.saveVideoToLibrary(url: url)
     }
@@ -707,6 +827,7 @@ public enum CameraError: LocalizedError, Sendable, Equatable {
     case cameraNotAvailable
     case setupFailed
     case captureFailed
+    case livePhotoUnavailable
     case recordingFailed
     case invalidConfiguration
     case cameraSwitchInProgress
@@ -716,13 +837,15 @@ public enum CameraError: LocalizedError, Sendable, Equatable {
         case .permissionDenied:
             return "Camera permission denied. Please enable camera access in Settings."
         case .microphonePermissionDenied:
-            return "Microphone permission denied. Video recording requires audio access."
+            return "Microphone permission denied. Video recording and Live Photos require audio access."
         case .cameraNotAvailable:
             return "Camera is not available on this device."
         case .setupFailed:
             return "Failed to setup camera session."
         case .captureFailed:
             return "Failed to capture photo."
+        case .livePhotoUnavailable:
+            return "Live Photo capture is unavailable for this camera or session configuration."
         case .recordingFailed:
             return "Failed to record video."
         case .invalidConfiguration:

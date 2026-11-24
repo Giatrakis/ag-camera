@@ -5,6 +5,7 @@ public struct AGCameraView: View {
     @Bindable var manager: AGCameraManager
     var configurationOverrides: [(inout AGCameraConfiguration) -> Void] = []
     var photoCaptureAction: ((UIImage) -> Void)?
+    var livePhotoCaptureAction: ((AGLivePhotoCapture) -> Void)?
     var videoStartedAction: ((URL) -> Void)?
     var videoStoppedAction: ((URL) -> Void)?
     var cameraPositionChangedAction: ((AVCaptureDevice.Position) -> Void)?
@@ -67,6 +68,10 @@ public struct AGCameraView: View {
             if let image = newValue {
                 photoCaptureAction?(image)
             }
+        }
+        .onChange(of: manager.lastCapturedLivePhoto?.pairedVideoURL) { oldValue, newValue in
+            guard oldValue != newValue, let capture = manager.lastCapturedLivePhoto else { return }
+            livePhotoCaptureAction?(capture)
         }
         .onChange(of: manager.lastStartedVideoURL) { oldValue, newValue in
             guard let url = newValue, oldValue != newValue else { return }
@@ -281,6 +286,36 @@ private extension AGCameraView {
                 Spacer()
             }
 
+            if manager.outputType == .photo {
+                Menu {
+                    ForEach(AGLivePhotoMode.allCases) { mode in
+                        Button {
+                            Task {
+                                do {
+                                    try await manager.setLivePhotoMode(mode)
+                                } catch {
+                                    present(error)
+                                }
+                            }
+                        } label: {
+                            if manager.livePhotoMode == mode {
+                                Label(mode.title, systemImage: "checkmark")
+                            } else {
+                                Text(mode.title)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: manager.livePhotoMode == .off ? "livephoto.slash" : "livephoto")
+                        .font(.title2)
+                        .foregroundStyle(manager.livePhotoMode == .on ? .yellow : .white)
+                        .padding(12)
+                        .background(Circle().fill(Color.black.opacity(0.5)))
+                }
+                .accessibilityLabel("Live Photo: \(manager.livePhotoMode.title)")
+                .disabled(!manager.isSessionRunning || manager.isSwitchingCamera)
+            }
+
         }
         .padding()
     }
@@ -324,7 +359,7 @@ private extension AGCameraView {
     private var capturePhotoButton: some View {
         AGCapturePhotoButton {
             do {
-                _ = try await manager.capturePhoto()
+                _ = try await manager.captureSelectedPhoto()
             } catch {
                 present(error)
             }
