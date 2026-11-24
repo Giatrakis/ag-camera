@@ -132,6 +132,12 @@ extension AGCameraView {
         overriding(\.enableLogging, with: enabled)
     }
 
+    public func exposureBias(_ value: Binding<Float>) -> Self {
+        var view = self
+        view.exposureBiasBinding = value
+        return view
+    }
+
     public func focusIndicator<V: View>(_ indicator: V) -> Self {
         overriding(\.focusIndicator, with: AnyView(indicator))
     }

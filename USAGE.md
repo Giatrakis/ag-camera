@@ -56,7 +56,7 @@ let configuration = AGCameraConfiguration(
 let camera = AGCameraManager(configuration: configuration)
 ```
 
-The view also exposes fluent modifiers for these settings, plus `.tapToFocusBehavior(.focusOnly)` and `.grid(.rule3x3)`. Tap behavior is `.none`, `.focusOnly`, or `.focusAndExposure`; `.enableTapToFocus(false)` disables taps. With `.focusAndExposure`, tapping the preview shows a sun beside the focus indicator. Drag up or down on the preview while it is visible to brighten or darken the image. Tapping a new point resets the adjustment to neutral 0 EV. The adjustment is exposure target bias, clamped to the selected camera's supported EV range. Grid options are `.none`, `.rule3x3`, and `.square4x4`. Modifiers are initial-only overrides applied before the first session setup; they are not a way to reconfigure an active session. Unmodified options continue to use the manager's latest configuration at setup time. Use manager methods for live changes. To manage camera permission yourself, use `.handlePermissions(false)` and authorize through `camera.permissionManager` first.
+The view also exposes fluent modifiers for these settings, plus `.tapToFocusBehavior(.focusOnly)` and `.grid(.rule3x3)`. Tap behavior is `.none`, `.focusOnly`, or `.focusAndExposure`; `.enableTapToFocus(false)` disables taps. With `.focusAndExposure`, tapping the preview shows a sun beside the focus indicator. Drag up or down on the preview while it is visible to brighten or darken the image. Tapping a new point resets the adjustment to neutral 0 EV. The adjustment is exposure target bias, clamped to the selected camera's supported EV range. Grid options are `.none`, `.rule3x3`, and `.square4x4`. Configuration modifiers are initial-only overrides applied before the first session setup; they are not a way to reconfigure an active session. `.exposureBias(_:)` is a live binding modifier for custom controls. Unmodified options continue to use the manager's latest configuration at setup time. Use manager methods for other live changes. To manage camera permission yourself, use `.handlePermissions(false)` and authorize through `camera.permissionManager` first.
 
 Photo quality accepts `.speed`, `.balanced`, or `.quality`. The session preset accepts any `AVCaptureSession.Preset` supported by the current camera, including `.photo`, `.high`, `.hd1920x1080`, and `.hd4K3840x2160`. Frame rate is an integer such as 24, 30, or 60 fps; the selected camera format must support it. For video codec, use `.h264`, `.hevc`, or `nil` to leave the system default. Recordings use a `.mov` container regardless of codec. Unsupported preset, frame rate, or codec selections report `CameraError.invalidConfiguration` when applied.
 
@@ -134,6 +134,30 @@ struct CustomCameraScreen: View {
 ```
 
 `AGCameraPreview` is an implementation detail and is not part of the public package API. Use `AGCameraView` when building a custom camera screen.
+
+For a custom exposure slider, pass its binding to the camera view. The slider value is applied after camera setup, clamped to the device's EV range, and updated when a preview tap resets exposure or the camera changes.
+
+```swift
+@State private var camera = AGCameraManager()
+@State private var exposureBias: Float = 0
+
+var body: some View {
+    VStack {
+        AGCameraView(manager: camera)
+            .showDefaultControls(false)
+            .exposureBias($exposureBias)
+
+        Slider("Exposure", value: $exposureBias, in: exposureRange)
+            .disabled(!camera.isSessionRunning || camera.maxExposureBias <= camera.minExposureBias)
+    }
+}
+
+private var exposureRange: ClosedRange<Float> {
+    camera.maxExposureBias > camera.minExposureBias
+        ? camera.minExposureBias...camera.maxExposureBias
+        : 0...1
+}
+```
 
 ## Custom video processing
 

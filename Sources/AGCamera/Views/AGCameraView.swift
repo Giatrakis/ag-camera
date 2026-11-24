@@ -11,6 +11,7 @@ public struct AGCameraView: View {
     var zoomChangedAction: ((CGFloat) -> Void)?
     var flashModeChangedAction: ((AVCaptureDevice.FlashMode) -> Void)?
     var errorAction: ((CameraError) -> Void)?
+    var exposureBiasBinding: Binding<Float>?
 
     @State private var showError = false
     @State private var errorMessage = ""
@@ -90,6 +91,23 @@ public struct AGCameraView: View {
         .onChange(of: manager.flashMode) { _, newValue in
             flashModeChangedAction?(newValue)
         }
+        .onChange(of: exposureBiasBinding?.wrappedValue) { _, newValue in
+            guard let newValue else { return }
+            applyBoundExposureBias(newValue)
+        }
+        .onChange(of: manager.currentExposureBias) { _, newValue in
+            guard exposureTask == nil else { return }
+            displayedExposureBias = newValue
+            synchronizeExposureBinding(to: newValue)
+        }
+        .onChange(of: manager.isSessionConfigured) { _, isConfigured in
+            guard isConfigured, let exposureBiasBinding else { return }
+            applyBoundExposureBias(exposureBiasBinding.wrappedValue)
+        }
+        .onChange(of: manager.isSwitchingCamera) { _, isSwitching in
+            guard !isSwitching, manager.isSessionConfigured else { return }
+            synchronizeExposureBinding(to: manager.currentExposureBias)
+        }
         .onChange(of: manager.error) { _, newValue in
             if let error = newValue {
                 errorAction?(error)
@@ -110,6 +128,9 @@ public struct AGCameraView: View {
             }
             guard !Task.isCancelled else { return }
             await setupCamera()
+            if let exposureBiasBinding {
+                applyBoundExposureBias(exposureBiasBinding.wrappedValue)
+            }
         }
         .onDisappear {
             focusRequestID = UUID()
@@ -401,8 +422,28 @@ private extension AGCameraView {
         let requestedBias = startBias - Float(value.translation.height / 120)
         let clampedBias = min(max(requestedBias, manager.minExposureBias), manager.maxExposureBias)
         guard abs(clampedBias - displayedExposureBias) >= 0.01 else { return }
-        displayedExposureBias = clampedBias
-        pendingExposureBias = clampedBias
+        requestExposureBias(clampedBias)
+    }
+
+    private func applyBoundExposureBias(_ requestedBias: Float) {
+        guard manager.isSessionConfigured, !manager.isSwitchingCamera else { return }
+        guard requestedBias.isFinite else {
+            synchronizeExposureBinding(to: manager.currentExposureBias)
+            return
+        }
+        let bias = min(max(requestedBias, manager.minExposureBias), manager.maxExposureBias)
+        if exposureTask != nil, abs(bias - displayedExposureBias) < 0.01 { return }
+        if abs(bias - manager.currentExposureBias) < 0.01 {
+            synchronizeExposureBinding(to: bias)
+            return
+        }
+        requestExposureBias(bias)
+    }
+
+    private func requestExposureBias(_ bias: Float) {
+        displayedExposureBias = bias
+        pendingExposureBias = bias
+        synchronizeExposureBinding(to: bias)
         guard exposureTask == nil else { return }
         exposureTask = Task {
             while let bias = pendingExposureBias, !Task.isCancelled {
@@ -414,8 +455,18 @@ private extension AGCameraView {
                     break
                 }
             }
+            if !Task.isCancelled {
+                synchronizeExposureBinding(to: manager.currentExposureBias)
+            }
             exposureTask = nil
         }
+    }
+
+    private func synchronizeExposureBinding(to bias: Float) {
+        guard let exposureBiasBinding,
+              !exposureBiasBinding.wrappedValue.isFinite
+                || abs(exposureBiasBinding.wrappedValue - bias) >= 0.01 else { return }
+        exposureBiasBinding.wrappedValue = bias
     }
 
     private func scheduleFocusIndicatorDismissal() {

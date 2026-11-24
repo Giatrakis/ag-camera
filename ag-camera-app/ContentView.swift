@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var presentedSheet: PresentedSheet?
     @State private var showControlError = false
     @State private var controlErrorMessage = ""
+    @State private var exposureBias: Float = 0
 
     init() {
         let configuration = AGCameraConfiguration(videoGravity: .resizeAspect)
@@ -20,6 +21,7 @@ struct ContentView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             AGCameraView(manager: cameraManager)
+                .exposureBias($exposureBias)
                 .onPhotoCapture { presentedSheet = .photo(CapturedPhoto(image: $0)) }
                 .onVideoStopped { presentedSheet = .video(CapturedVideo(url: $0)) }
                 .id(cameraIdentity)
@@ -73,6 +75,23 @@ struct ContentView: View {
     private var customControls: some View {
         VStack {
             Spacer()
+            VStack(spacing: 8) {
+                HStack {
+                    Label("Exposure", systemImage: "sun.max.fill")
+                    Spacer()
+                    Text(String(format: "%+.1f EV", exposureBias))
+                        .monospacedDigit()
+                }
+                Slider(value: $exposureBias, in: exposureRange)
+                    .tint(.yellow)
+                    .disabled(!cameraManager.isSessionRunning || cameraManager.maxExposureBias <= cameraManager.minExposureBias)
+            }
+            .foregroundStyle(.white)
+            .padding(16)
+            .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
+
             HStack(spacing: 20) {
                 Button {
                     runCameraAction { _ = try await cameraManager.capturePhoto() }
@@ -105,6 +124,12 @@ struct ContentView: View {
             .background(.black.opacity(0.65), in: Capsule())
             .padding(.bottom, 24)
         }
+    }
+
+    private var exposureRange: ClosedRange<Float> {
+        cameraManager.maxExposureBias > cameraManager.minExposureBias
+            ? cameraManager.minExposureBias...cameraManager.maxExposureBias
+            : 0...1
     }
 }
 
@@ -207,6 +232,7 @@ private struct SharedRecording: Transferable {
 private extension ContentView {
     func applySettings(_ configuration: AGCameraConfiguration) {
         presentedSheet = nil
+        exposureBias = 0
         cameraManager = AGCameraManager(configuration: configuration)
         cameraIdentity = UUID()
     }
