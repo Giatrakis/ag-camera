@@ -16,7 +16,7 @@ class AGMediaLibraryManager {
     }
 
     func savePhotoToLibrary(_ data: Data) async throws {
-        guard permissionManager.isPhotoLibraryAuthorized else {
+        guard await permissionManager.requestPhotoLibraryPermission() else {
             throw CameraError.permissionDenied
         }
 
@@ -30,7 +30,7 @@ class AGMediaLibraryManager {
     }
 
     func saveVideoToLibrary(url: URL) async throws {
-        guard permissionManager.isPhotoLibraryAuthorized else {
+        guard await permissionManager.requestPhotoLibraryPermission() else {
             throw CameraError.permissionDenied
         }
 

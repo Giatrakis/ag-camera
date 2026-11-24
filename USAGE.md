@@ -1,352 +1,146 @@
-# AG Camera Library - Usage Guide
+# AGCamera usage
 
-A powerful, reusable iOS camera library built with SwiftUI and AVFoundation, supporting iOS 26+.
+AGCamera is a SwiftUI package for iOS 26 and later. The current SDK exposes `AGCameraView` for a ready-to-use camera screen and `AGCameraManager` for custom controls. Camera capture must be tested on a physical iOS device.
 
-## Architecture
+## Installation and privacy descriptions
 
-```
-┌─────────────────────────────────────────┐
-│      SwiftUI Layer (Your Custom UI)     │
-│   Add any buttons/controls you want     │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│      AGCameraManager                    │
-│  All camera methods at your disposal:   │
-│  • capturePhoto()                       │
-│  • startVideoRecording()                │
-│  • stopVideoRecording()                 │
-│  • switchCamera()                       │
-│  • toggleFlash()                        │
-│  • setZoom(factor:)                     │
-│  • setFocus(at:)                        │
-│  • and many more...                     │
-└─────────────────────────────────────────┘
-```
+Add this repository as a Swift package dependency in Xcode, then link the `AGCamera` product to the host app. The package uses Swift 5 language mode and a Swift 6.0 or newer toolchain.
 
-## Key Features
+The host app must define `NSCameraUsageDescription` for preview and capture. Define `NSMicrophoneUsageDescription` when recording audio and `NSPhotoLibraryAddUsageDescription` when saving media to Photos. These keys belong in the host app's Info.plist, not in the Swift package.
 
-✅ **Photo Capture** - High-quality photo capture with flash support
-✅ **Video Recording** - Video recording with audio
-✅ **Camera Switching** - Front/back camera toggle
-✅ **Flash Control** - Off, On, Auto modes
-✅ **Torch Mode** - Flashlight for video recording
-✅ **Focus & Exposure** - Tap to focus, manual controls
-✅ **Zoom** - Pinch to zoom functionality
-✅ **Resolution Control** - 4K, 1080p, 720p, photo presets
-✅ **Quality Settings** - Quality vs speed prioritization
-✅ **Video Stabilization** - Smooth video recording
-✅ **Frame Rate Control** - FPS settings
-✅ **All Apple Native Enums** - No custom wrappers!
-
-## Quick Start
-
-### 1. Request Permissions
+## Ready-to-use view
 
 ```swift
-let permissionManager = AGPermissionManager()
+import AGCamera
+import SwiftUI
 
-// Request all permissions
-let result = await permissionManager.requestAllPermissions()
-
-// Or request individually
-let cameraGranted = await permissionManager.requestCameraPermission()
-let micGranted = await permissionManager.requestMicrophonePermission()
-let photoGranted = await permissionManager.requestPhotoLibraryPermission()
-```
-
-### 2. Setup Camera Manager
-
-```swift
-// Initialize with permission manager
-let cameraManager = AGCameraManager(permissionManager: permissionManager)
-
-// Setup session
-try await cameraManager.setupSession()
-
-// Start session
-cameraManager.startSession()
-```
-
-### 3. Display Camera Preview
-
-```swift
-AGCameraPreview(
-    session: cameraManager.getCaptureSession(),
-    videoGravity: .resizeAspectFill
-)
-```
-
-### 4. Add Custom Buttons
-
-```swift
-// Photo capture button
-Button("Take Photo") {
-    Task {
-        let photoData = try await cameraManager.capturePhoto()
-        let image = UIImage(data: photoData)
-        // Do something with the image
-    }
-}
-
-// Video recording button
-Button(cameraManager.isRecording ? "Stop" : "Record") {
-    if cameraManager.isRecording {
-        cameraManager.stopVideoRecording()
-    } else {
-        Task {
-            let videoURL = try await cameraManager.startVideoRecording()
-            // Video saved at videoURL
-        }
-    }
-}
-
-// Switch camera button
-Button("Flip") {
-    Task {
-        try await cameraManager.switchCamera()
-    }
-}
-
-// Flash toggle button
-Button("Flash") {
-    cameraManager.toggleFlash()
-}
-```
-
-## Complete Method Reference
-
-### Photo Capture
-```swift
-// Capture photo
-let photoData = try await cameraManager.capturePhoto()
-```
-
-### Video Recording
-```swift
-// Start recording (returns URL when stopped)
-let videoURL = try await cameraManager.startVideoRecording()
-
-// Stop recording
-cameraManager.stopVideoRecording()
-
-// Check recording state
-if cameraManager.isRecording { }
-```
-
-### Camera Controls
-```swift
-// Switch camera
-try await cameraManager.switchCamera()
-
-// Get current position
-let position = cameraManager.currentCameraPosition // .back or .front
-```
-
-### Flash Controls
-```swift
-// Toggle flash (off -> on -> auto -> off)
-cameraManager.toggleFlash()
-
-// Set specific mode
-cameraManager.setFlashMode(.on)    // Use Apple's enum
-cameraManager.setFlashMode(.off)
-cameraManager.setFlashMode(.auto)
-
-// Check availability
-if cameraManager.isFlashAvailable { }
-
-// Torch (flashlight) for video
-try cameraManager.setTorch(enabled: true)
-```
-
-### Focus & Exposure
-```swift
-// Tap to focus (point is normalized 0-1)
-try cameraManager.setFocus(at: CGPoint(x: 0.5, y: 0.5))
-
-// Set exposure point
-try cameraManager.setExposure(at: CGPoint(x: 0.5, y: 0.5))
-
-// Both at once (common use case)
-try cameraManager.setFocusAndExposure(at: point)
-
-// Set modes (using Apple's native enums)
-try cameraManager.setFocusMode(.autoFocus)
-try cameraManager.setFocusMode(.continuousAutoFocus)
-try cameraManager.setFocusMode(.locked)
-
-try cameraManager.setExposureMode(.autoExpose)
-try cameraManager.setExposureMode(.continuousAutoExposure)
-try cameraManager.setExposureMode(.locked)
-
-// Lock current settings
-try cameraManager.lockExposureAndFocus()
-
-// Reset to auto
-try cameraManager.resetFocusAndExposure()
-```
-
-### Zoom Controls
-```swift
-// Set zoom factor
-try cameraManager.setZoom(factor: 2.0)  // 2x zoom
-
-// Get current zoom
-let currentZoom = cameraManager.currentZoomFactor
-
-// Get zoom limits
-let maxZoom = cameraManager.maxZoomFactor
-let minZoom = cameraManager.minZoomFactor
-```
-
-### Resolution & Quality
-```swift
-// Set resolution preset (using Apple's native enums)
-try cameraManager.setSessionPreset(.hd4K3840x2160)
-try cameraManager.setSessionPreset(.hd1920x1080)
-try cameraManager.setSessionPreset(.hd1280x720)
-try cameraManager.setSessionPreset(.photo)
-
-// Get current preset
-let preset = cameraManager.currentSessionPreset
-
-// Get supported presets
-let supported = cameraManager.supportedSessionPresets
-
-// Set photo quality prioritization
-cameraManager.setPhotoQualityPrioritization(.quality)
-cameraManager.setPhotoQualityPrioritization(.balanced)
-cameraManager.setPhotoQualityPrioritization(.speed)
-
-// Video stabilization
-cameraManager.setVideoStabilizationMode(.auto)
-cameraManager.setVideoStabilizationMode(.cinematic)
-cameraManager.setVideoStabilizationMode(.standard)
-
-// Frame rate
-try cameraManager.setFrameRate(fps: 60)
-try cameraManager.setFrameRate(fps: 30)
-```
-
-### Session Management
-```swift
-// Start session
-cameraManager.startSession()
-
-// Stop session
-cameraManager.stopSession()
-
-// Check if running
-if cameraManager.isSessionRunning { }
-```
-
-## Example: Custom Camera UI
-
-```swift
-struct MyCameraView: View {
-    @State private var permissionManager = AGPermissionManager()
-    @State private var cameraManager: AGCameraManager?
+struct CameraScreen: View {
+    @State private var camera = AGCameraManager()
+    @State private var capturedImage: UIImage?
+    @State private var recordingURL: URL?
+    @State private var errorMessage: String?
 
     var body: some View {
-        ZStack {
-            // Camera preview
-            if let manager = cameraManager {
-                AGCameraPreview(session: manager.getCaptureSession())
-                    .ignoresSafeArea()
-            }
+        AGCameraView(manager: camera)
+            .onPhotoCapture { capturedImage = $0 }
+            .onVideoStopped { recordingURL = $0 }
+            .onError { errorMessage = $0.localizedDescription }
+    }
+}
+```
 
-            // Your custom UI
-            VStack {
-                HStack {
-                    // Custom flash button
-                    MyFlashButton(action: {
-                        cameraManager?.toggleFlash()
-                    })
+`AGCameraView` requests camera permission by default, configures the capture session, starts it while the view is visible, and stops it when the view disappears. It does not automatically save captures to Photos. The URL returned for a video is in the temporary directory; move it or save it before relying on long-term retention.
 
-                    Spacer()
+Initial options can be supplied when creating the manager:
 
-                    // Custom settings button
-                    MySettingsButton()
+```swift
+let configuration = AGCameraConfiguration(
+    showDefaultControls: false,
+    defaultCameraPosition: .back,
+    defaultFlashMode: .off,
+    defaultZoomScale: 1,
+    sessionPreset: .hd1920x1080
+)
+let camera = AGCameraManager(configuration: configuration)
+```
+
+The view also exposes fluent configuration modifiers such as `.showDefaultControls(false)`, `.enableTapToFocus(false)`, `.defaultCameraPosition(.front)`, `.sessionPreset(.hd1920x1080)`, and `.videoFrameRate(30)`. Set initial options before the view starts its session. To manage camera permission yourself, use `.handlePermissions(false)` and authorize through `camera.permissionManager` first.
+
+## Permissions
+
+Camera access is required for preview and capture. The view requests it during setup when permission handling is enabled. Starting a recording requests microphone access when needed, and saving media requests photo library add access when needed. A user who denies either optional permission can still use camera-only features.
+
+```swift
+let camera = AGCameraManager()
+let cameraGranted = await camera.permissionManager.requestCameraPermission()
+let microphoneGranted = await camera.permissionManager.requestMicrophonePermission()
+let libraryGranted = await camera.permissionManager.requestPhotoLibraryPermission()
+```
+
+`AGPermissionManager.requestAllPermissions()` is available when an app intentionally needs all three permissions, but it is not a prerequisite for photo capture.
+
+## Custom controls
+
+Hide the built-in controls and place app-specific controls above `AGCameraView`. The view continues to own preview and session lifecycle.
+
+```swift
+import AGCamera
+import SwiftUI
+
+struct CustomCameraScreen: View {
+    @State private var camera = AGCameraManager()
+    @State private var errorMessage: String?
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            AGCameraView(manager: camera)
+                .showDefaultControls(false)
+
+            HStack {
+                Button("Capture") {
+                    Task {
+                        do {
+                            _ = try await camera.capturePhoto()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
                 }
 
-                Spacer()
-
-                HStack(spacing: 40) {
-                    // Custom camera switch button
-                    MySwitchButton {
-                        try? await cameraManager?.switchCamera()
+                Button(camera.isRecording ? "Stop" : "Record") {
+                    Task {
+                        do {
+                            if camera.isRecording {
+                                _ = try await camera.stopVideoRecording()
+                            } else {
+                                _ = try await camera.startVideoRecording()
+                            }
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
                     }
+                }
 
-                    // Custom capture button
-                    MyCaptureButton {
-                        let data = try? await cameraManager?.capturePhoto()
-                        // Process photo
-                    }
-
-                    // Custom video button
-                    MyVideoButton {
-                        if cameraManager?.isRecording == true {
-                            cameraManager?.stopVideoRecording()
-                        } else {
-                            let url = try? await cameraManager?.startVideoRecording()
+                Button("Switch") {
+                    Task {
+                        do {
+                            try await camera.switchCamera()
+                        } catch {
+                            errorMessage = error.localizedDescription
                         }
                     }
                 }
             }
             .padding()
         }
-        .task {
-            await setupCamera()
-        }
-    }
-
-    private func setupCamera() async {
-        await permissionManager.requestAllPermissions()
-        let manager = AGCameraManager(permissionManager: permissionManager)
-        try? await manager.setupSession()
-        manager.startSession()
-        cameraManager = manager
     }
 }
 ```
 
-## Native Enums Used
+`AGCameraPreview` is an implementation detail and is not part of the public package API. Use `AGCameraView` when building a custom camera screen.
 
-This library uses Apple's native enums directly - no custom wrappers!
+## Capture results and saving
 
-- `AVCaptureDevice.Position` (.front, .back)
-- `AVCaptureDevice.FlashMode` (.off, .on, .auto)
-- `AVCaptureDevice.FocusMode` (.autoFocus, .continuousAutoFocus, .locked)
-- `AVCaptureDevice.ExposureMode` (.autoExpose, .continuousAutoExposure, .locked)
-- `AVCaptureSession.Preset` (.photo, .hd4K3840x2160, etc.)
-- `AVCapturePhotoOutput.QualityPrioritization` (.quality, .balanced, .speed)
-- `AVCaptureVideoStabilizationMode` (.auto, .cinematic, .standard, .off)
-- `AVAuthorizationStatus` (for permissions)
-- `PHAuthorizationStatus` (for photo library)
-
-## Error Handling
+`capturePhoto()` returns encoded image `Data`. `startVideoRecording()` returns the temporary movie URL after recording starts. `stopVideoRecording()` returns the completed movie URL. Both video methods are asynchronous and throwing.
 
 ```swift
-do {
-    let photo = try await cameraManager.capturePhoto()
-} catch CameraError.permissionDenied {
-    // Handle permission error
-} catch CameraError.cameraNotAvailable {
-    // Handle camera not available
-} catch CameraError.captureFailed {
-    // Handle capture failure
-} catch {
-    // Handle other errors
-}
+let photoData = try await camera.capturePhoto()
+
+let recordingURL = try await camera.startVideoRecording()
+let completedURL = try await camera.stopVideoRecording()
+
+try await camera.savePhotoToLibrary(photoData)
+try await camera.saveVideoToLibrary(url: completedURL)
 ```
 
-## Requirements
+The start URL and completed URL refer to the recording file. `saveVideoToLibrary(url:)` removes the temporary file after a successful save. The manager does not save photos or videos automatically.
 
-- iOS 26.0+
-- Swift 6.0+
-- Xcode 16.0+
+## Camera controls
 
-## License
+`AGCameraManager` exposes `switchCamera()`, `setFlashMode(_:)`, `toggleFlash()`, `setTorch(enabled:)`, `setZoom(factor:)`, `setFocus(at:)`, `setExposure(at:)`, and `setFocusAndExposure(at:)`. Focus and exposure points are normalized device points in the range 0...1. `AGCameraView` converts taps on its preview into device points. The manager also exposes photo quality, session preset, video stabilization, and frame rate controls.
 
-See project license.
+`setupSession()` is required before using the manager without `AGCameraView`. Call `requestCameraPermission()` first, then `setupSession()` and `startSession()`. Call `stopSession()` when capture is no longer needed. The start and stop methods queue session work; observe `isSessionRunning` for the resulting state.
+
+## Current scope
+
+The SDK currently supports still photos, movie-file recording, a SwiftUI preview with built-in controls, and direct camera settings. It does not provide a media browser, capture format picker, editing pipeline, or automatic persistence. `AGCameraView` displays camera errors in an alert; the host app owns saved media.

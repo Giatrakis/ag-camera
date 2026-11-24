@@ -5,8 +5,17 @@ import OSLog
 public struct AGCameraView: View {
     private static let logger = Logger(subsystem: "com.agcamera", category: "CameraView")
     @Bindable var manager: AGCameraManager
+    var configuration: AGCameraConfiguration
+    var photoCaptureAction: ((UIImage) -> Void)?
+    var videoStartedAction: ((URL) -> Void)?
+    var videoStoppedAction: ((URL) -> Void)?
+    var cameraPositionChangedAction: ((AVCaptureDevice.Position) -> Void)?
+    var zoomChangedAction: ((CGFloat) -> Void)?
+    var flashModeChangedAction: ((AVCaptureDevice.FlashMode) -> Void)?
+    var errorAction: ((CameraError) -> Void)?
 
     @State private var showError = false
+    @State private var errorMessage = ""
     @State private var focusPoint: CGPoint?
     @State private var showFocusIndicator = false
     @State private var focusTask: Task<Void, Never>?
@@ -15,47 +24,21 @@ public struct AGCameraView: View {
 
     public init(manager: AGCameraManager) {
         self.manager = manager
+        self.configuration = manager.configuration
+    }
+
+    private var tapToFocusHandler: ((CGPoint, CGPoint) -> Void)? {
+        guard configuration.enableTapToFocus else { return nil }
+        return { location, devicePoint in
+            handleTapToFocus(at: location, devicePoint: devicePoint)
+        }
     }
     
     public var body: some View {
         ZStack {
-            GeometryReader { previewGeometry in
-                AGCameraPreview(
-                    session: manager.getCaptureSession(),
-                    videoGravity: manager.configuration.videoGravity,
-                    cameraPosition: manager.currentCameraPosition
-                )
-                .ignoresSafeArea()
-                .conditionalModifier(manager.configuration.enableTapToFocus) { view in
-                    view.onTapGesture { location in
-                        handleTapToFocus(at: location, in: previewGeometry.size)
-                    }
-                }
-                .gesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            try? manager.updateZoomInteractively(scale: value, isGestureEnded: false)
-                        }
-                        .onEnded { value in
-                            try? manager.updateZoomInteractively(scale: value, isGestureEnded: true)
-                        }
-                )
-                .overlay { transitionSnapshotOverlay }
-                .blur(radius: manager.isBlurred ? 50 : 0)
-//                .rotation3DEffect(
-//                    .degrees(manager.isBlurred ? manager.flipRotation : 0),
-//                    axis: (x: 0, y: 1, z: 0)
-//                )
-                .overlay {
-                    if showFocusIndicator, let point = focusPoint {
-                        manager.configuration.focusIndicator
-                            .position(point)
-                            .allowsHitTesting(false)
-                    }
-                }
-            }
+            cameraPreview
 
-            if manager.configuration.showDefaultControls {
+            if configuration.showDefaultControls {
                 VStack(spacing: 0) {
                     topControlsView
                     Spacer()
@@ -66,47 +49,44 @@ public struct AGCameraView: View {
         .ignoresSafeArea(edges: .bottom)
         .onChange(of: manager.capturedImage) { _, newValue in
             if let image = newValue {
-                manager.onPhotoCapture?(image)
+                photoCaptureAction?(image)
                 manager.capturedImage = nil
             }
         }
-        .onChange(of: manager.lastVideoURL) { oldValue, newValue in
+        .onChange(of: manager.lastStartedVideoURL) { oldValue, newValue in
             guard let url = newValue, oldValue != newValue else { return }
-
-            if manager.isRecording {
-                manager.onVideoStarted?(url)
-            } else {
-                manager.onVideoStopped?(url)
-            }
-
-            manager.lastVideoURL = nil
+            videoStartedAction?(url)
+        }
+        .onChange(of: manager.lastStoppedVideoURL) { oldValue, newValue in
+            guard let url = newValue, oldValue != newValue else { return }
+            videoStoppedAction?(url)
         }
         .onChange(of: manager.currentZoomFactor) { _, newValue in
-            manager.onZoomChanged?(newValue)
+            zoomChangedAction?(newValue)
         }
         .onChange(of: manager.currentCameraPosition) { _, newValue in
-            manager.onCameraPositionChanged?(newValue)
+            cameraPositionChangedAction?(newValue)
         }
         .onChange(of: manager.flashMode) { _, newValue in
-            manager.onFlashModeChanged?(newValue)
+            flashModeChangedAction?(newValue)
         }
         .onChange(of: manager.error) { _, newValue in
             if let error = newValue {
-                manager.onError?(error)
-                showError = true
+                errorAction?(error)
+                present(error)
             }
         }
         .task {
-            if manager.configuration.handlePermissions {
-                let result = await manager.permissionManager.requestAllPermissions()
-                if result.allGranted {
-                    await setupCamera()
-                } else {
-                    showError = true
+            manager.configuration = configuration
+            manager.setFlashMode(configuration.defaultFlashMode)
+            if configuration.handlePermissions {
+                guard await manager.permissionManager.requestCameraPermission() else {
+                    present(CameraError.permissionDenied)
+                    return
                 }
-            } else {
-                await setupCamera()
             }
+            guard !Task.isCancelled else { return }
+            await setupCamera()
         }
         .onDisappear {
             manager.stopSession()
@@ -123,18 +103,44 @@ public struct AGCameraView: View {
                 break
             }
         }
-//        .alert("Error", isPresented: $showError) {
-//            Button("OK") {
-//                showError = false
-//            }
-//        } message: {
-//            Text(manager.error?.localizedDescription ?? "Unknown error")
-//        }
+        .alert("Camera Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
     }
-}
 
-// MARK: - Snapshot Overlay
-private extension AGCameraView {
+    private var cameraPreview: some View {
+        AGCameraPreview(
+            session: manager.getCaptureSession(),
+            videoGravity: configuration.videoGravity,
+            cameraPosition: manager.currentCameraPosition,
+            onTapToFocus: tapToFocusHandler
+        )
+        .ignoresSafeArea()
+        .gesture(
+            MagnifyGesture()
+                .onChanged { value in
+                    try? manager.updateZoomInteractively(scale: value.magnification, isGestureEnded: false)
+                }
+                .onEnded { value in
+                    try? manager.updateZoomInteractively(scale: value.magnification, isGestureEnded: true)
+                }
+        )
+        .overlay { transitionSnapshotOverlay }
+        .blur(radius: manager.isBlurred ? 50 : 0)
+        .overlay { focusIndicatorOverlay }
+    }
+
+    @ViewBuilder
+    private var focusIndicatorOverlay: some View {
+        if showFocusIndicator, let point = focusPoint {
+            configuration.focusIndicator
+                .position(point)
+                .allowsHitTesting(false)
+        }
+    }
+
     @ViewBuilder
     private var transitionSnapshotOverlay: some View {
         if let snapshot = manager.transitionSnapshot {
@@ -208,7 +214,7 @@ private extension AGCameraView {
                 try manager.setZoom(factor: newZoomLevel)
             } catch {
                 Self.logger.error("Zoom error: \(error.localizedDescription)")
-                showError = true
+                present(error)
             }
         }
     }
@@ -218,7 +224,7 @@ private extension AGCameraView {
             do {
                 _ = try await manager.capturePhoto()
             } catch {
-                showError = true
+                present(error)
             }
         }
     }
@@ -232,14 +238,18 @@ private extension AGCameraView {
                     _ = try await manager.startVideoRecording()
                 }
             } catch {
-                showError = true
+                present(error)
             }
         }
     }
     
     private var switchCameraButton: some View {
         AGSwitchCameraButton {
-            try? await manager.switchCamera()
+            do {
+                try await manager.switchCamera()
+            } catch {
+                present(error)
+            }
         }
     }
 }
@@ -249,26 +259,26 @@ private extension AGCameraView {
     private func setupCamera() async {
         do {
             try await manager.setupSession()
+            guard !Task.isCancelled else { return }
             manager.startSession()
 
             Self.logger.info("Camera Info - Min Zoom: \(String(format: "%.1f", manager.minZoomFactor))×, Max Zoom: \(String(format: "%.1f", manager.maxZoomFactor))×, Current Zoom: \(String(format: "%.1f", manager.currentZoomFactor))×")
         } catch {
-            showError = true
+            present(error)
         }
     }
 
-    private func handleTapToFocus(at location: CGPoint, in viewSize: CGSize) {
+    private func handleTapToFocus(at location: CGPoint, devicePoint: CGPoint) {
         focusTask?.cancel()
 
         focusPoint = location
         showFocusIndicator = true
 
-        let normalizedPoint = CGPoint(
-            x: location.x / viewSize.width,
-            y: location.y / viewSize.height
-        )
-
-        try? manager.setFocusAndExposure(at: normalizedPoint)
+        do {
+            try manager.setFocusAndExposure(at: devicePoint)
+        } catch {
+            present(error)
+        }
 
         focusTask = Task {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -277,6 +287,11 @@ private extension AGCameraView {
                 showFocusIndicator = false
             }
         }
+    }
+
+    private func present(_ error: Error) {
+        errorMessage = error.localizedDescription
+        showError = true
     }
 }
 

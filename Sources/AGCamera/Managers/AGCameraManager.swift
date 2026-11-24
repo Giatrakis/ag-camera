@@ -30,6 +30,8 @@ public class AGCameraManager: NSObject {
     // Observable state for reactive UI
     public var capturedImage: UIImage?
     public var lastVideoURL: URL?
+    public private(set) var lastStartedVideoURL: URL?
+    public private(set) var lastStoppedVideoURL: URL?
     public var lastCapturedPhotoData: Data?
 
     // Camera switch animation state
@@ -53,11 +55,13 @@ public class AGCameraManager: NSObject {
     private let zoomManager: AGZoomManager
     private let qualitySettings: AGQualitySettingsManager
     private let mediaLibrary: AGMediaLibraryManager
+    private var sessionCommandID = 0
 
     public var configuration: AGCameraConfiguration
     public let permissionManager: AGPermissionManager
 
-    public init(configuration: AGCameraConfiguration = .default) {
+    public init(configuration suppliedConfiguration: AGCameraConfiguration? = nil) {
+        let configuration = suppliedConfiguration ?? .default
         self.configuration = configuration
         self.permissionManager = AGPermissionManager()
         self.currentCameraPosition = configuration.defaultCameraPosition
@@ -86,6 +90,12 @@ public class AGCameraManager: NSObject {
             }
         }
     }
+
+    private func reportError(_ failure: Error, fallback: CameraError) {
+        let cameraError = failure as? CameraError ?? fallback
+        error = cameraError
+        onError?(cameraError)
+    }
 }
 
 // MARK: - Session Management
@@ -93,8 +103,7 @@ public class AGCameraManager: NSObject {
 extension AGCameraManager {
 
     public func setupSession() async throws {
-        // Prevent duplicate setup by checking if session already has video input
-        guard sessionManager.videoDeviceInput == nil else {
+        guard !sessionManager.isConfigured else {
             Self.logger.info("Session already configured, skipping setup")
             return
         }
@@ -102,7 +111,7 @@ extension AGCameraManager {
         if configuration.handlePermissions {
             guard permissionManager.isCameraAuthorized else {
                 let error = CameraError.permissionDenied
-                self.error = error
+                reportError(error, fallback: .permissionDenied)
                 throw error
             }
         }
@@ -114,36 +123,47 @@ extension AGCameraManager {
 
             sessionManager.setPhotoQualityPrioritization(configuration.photoQualityPrioritization)
 
-            try? zoomManager.setZoom(factor: configuration.defaultZoomScale)
-            currentZoomFactor = configuration.defaultZoomScale
-            lastZoomFactor = configuration.defaultZoomScale
+            let appliedZoom = (try? zoomManager.setZoom(factor: configuration.defaultZoomScale))
+                ?? zoomManager.getCurrentZoomFactor()
+            currentZoomFactor = appliedZoom
+            lastZoomFactor = appliedZoom
 
             self.error = nil
         } catch {
-            self.error = error as? CameraError ?? .setupFailed
+            reportError(error, fallback: .setupFailed)
             throw error
         }
     }
 
     public func startSession() {
-        sessionManager.startSession()
-        isSessionRunning = sessionManager.captureSession.isRunning
+        sessionCommandID += 1
+        let commandID = sessionCommandID
+        sessionManager.startSession { [weak self] isRunning in
+            Task { @MainActor [weak self] in
+                guard let self, self.sessionCommandID == commandID else { return }
+                self.isSessionRunning = isRunning
+            }
+        }
     }
 
     public func stopSession() {
-        sessionManager.stopSession()
-        isSessionRunning = false
+        sessionCommandID += 1
+        let commandID = sessionCommandID
+        sessionManager.stopSession { [weak self] isRunning in
+            Task { @MainActor [weak self] in
+                guard let self, self.sessionCommandID == commandID else { return }
+                self.isSessionRunning = isRunning
+            }
+        }
     }
 
     public func handleAppBackground() {
-        if isSessionRunning {
-            stopSession()
-        }
+        stopSession()
     }
 
     public func handleAppForeground() {
         let hasPermission = configuration.handlePermissions ? permissionManager.isCameraAuthorized : true
-        if !isSessionRunning && hasPermission {
+        if hasPermission && sessionManager.isConfigured {
             startSession()
         }
     }
@@ -163,11 +183,18 @@ extension AGCameraManager {
             throw CameraError.cameraSwitchInProgress
         }
 
-        let data = try await captureManager.capturePhoto()
+        let data: Data
+        do {
+            data = try await captureManager.capturePhoto()
+        } catch {
+            reportError(error, fallback: .captureFailed)
+            throw error
+        }
 
         // Set observable state for reactive UI
         if let image = UIImage(data: data) {
             capturedImage = image
+            onPhotoCapture?(image)
         }
         lastCapturedPhotoData = data
 
@@ -187,19 +214,43 @@ extension AGCameraManager {
 
         let savedZoom = currentZoomFactor
 
+        if await permissionManager.requestMicrophonePermission() {
+            do {
+                try await sessionManager.ensureAudioInput()
+            } catch {
+                Self.logger.warning("Recording without audio: \(error.localizedDescription)")
+            }
+        }
+
         try? qualitySettings.setFrameRate(fps: configuration.videoFrameRate)
 
-        try? zoomManager.setZoom(factor: savedZoom)
+        _ = try? zoomManager.setZoom(factor: savedZoom)
         currentZoomFactor = savedZoom
 
-        let url = try await captureManager.startVideoRecording()
+        let url: URL
+        do {
+            url = try await captureManager.startVideoRecording()
+        } catch {
+            reportError(error, fallback: .recordingFailed)
+            throw error
+        }
         lastVideoURL = url
+        lastStartedVideoURL = url
+        onVideoStarted?(url)
         return url
     }
 
     public func stopVideoRecording() async throws -> URL {
-        let url = try await captureManager.stopVideoRecording()
+        let url: URL
+        do {
+            url = try await captureManager.stopVideoRecording()
+        } catch {
+            reportError(error, fallback: .recordingFailed)
+            throw error
+        }
         lastVideoURL = url
+        lastStoppedVideoURL = url
+        onVideoStopped?(url)
         return url
     }
 }
@@ -247,9 +298,14 @@ extension AGCameraManager {
             deviceControl.configureVideoMirroring(for: newPosition)
 
             currentCameraPosition = newPosition
+            onCameraPositionChanged?(newPosition)
             currentZoomFactor = configuration.defaultZoomScale
             lastZoomFactor = configuration.defaultZoomScale
-            try? zoomManager.setZoom(factor: configuration.defaultZoomScale)
+            if let appliedZoom = try? zoomManager.setZoom(factor: configuration.defaultZoomScale) {
+                currentZoomFactor = appliedZoom
+                lastZoomFactor = appliedZoom
+                onZoomChanged?(appliedZoom)
+            }
 
             if animated {
                 // Wait for flip to complete and preview to stabilize
@@ -264,7 +320,10 @@ extension AGCameraManager {
 
             isSwitchingCamera = false
         } catch {
+            transitionSnapshot = nil
+            isBlurred = false
             isSwitchingCamera = false
+            reportError(error, fallback: .setupFailed)
             throw error
         }
     }
@@ -272,6 +331,7 @@ extension AGCameraManager {
     public func setFlashMode(_ mode: AVCaptureDevice.FlashMode) {
         self.flashMode = mode
         captureManager.flashMode = mode
+        onFlashModeChanged?(mode)
     }
 
     public func toggleFlash() {
@@ -289,6 +349,7 @@ extension AGCameraManager {
 
         self.flashMode = newMode
         captureManager.flashMode = newMode
+        onFlashModeChanged?(newMode)
     }
 
     public var isFlashAvailable: Bool {
@@ -363,6 +424,7 @@ extension AGCameraManager {
     public func setZoom(factor: CGFloat) throws {
         currentZoomFactor = try zoomManager.setZoom(factor: factor)
         lastZoomFactor = currentZoomFactor
+        onZoomChanged?(currentZoomFactor)
     }
 
     public func updateZoomInteractively(scale: CGFloat, isGestureEnded: Bool) throws {
@@ -372,6 +434,7 @@ extension AGCameraManager {
         let clampedZoom = min(max(newZoom, minZoom), maxZoom)
 
         currentZoomFactor = try zoomManager.setZoom(factor: clampedZoom)
+        onZoomChanged?(currentZoomFactor)
 
         if isGestureEnded {
             lastZoomFactor = currentZoomFactor

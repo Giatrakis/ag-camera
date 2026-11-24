@@ -1,37 +1,27 @@
-//
-//  AGSessionManager.swift
-//  ag-camera
-//
-
 import AVFoundation
 import OSLog
 
 @MainActor
-public class AGSessionManager {
-
-    private static let logger = Logger(subsystem: "com.agcamera", category: "SessionManager")
-
-    public let captureSession = AVCaptureSession()
-    let sessionQueue = DispatchQueue(label: "com.agcamera.sessionQueue")
-
-    private(set) var videoDeviceInput: AVCaptureDeviceInput?
-    private(set) var audioDeviceInput: AVCaptureDeviceInput?
-    private(set) var photoOutput: AVCapturePhotoOutput?
-    private(set) var movieFileOutput: AVCaptureMovieFileOutput?
-    private(set) var currentDevice: AVCaptureDevice?
-    private(set) var currentPosition: AVCaptureDevice.Position = .back
-
+public final class AGSessionManager {
+    private let worker = CameraSessionWorker()
     private let permissionManager: AGPermissionManager
     private var isSwitchingCamera = false
+
+    public var captureSession: AVCaptureSession { worker.captureSession }
+    var videoDeviceInput: AVCaptureDeviceInput? { worker.videoDeviceInput }
+    var audioDeviceInput: AVCaptureDeviceInput? { worker.audioDeviceInput }
+    var photoOutput: AVCapturePhotoOutput? { worker.photoOutput }
+    var movieFileOutput: AVCaptureMovieFileOutput? { worker.movieFileOutput }
+    var currentDevice: AVCaptureDevice? { worker.currentDevice }
+    var currentPosition: AVCaptureDevice.Position { worker.currentPosition }
+    var isConfigured: Bool { worker.isConfigured }
 
     init(permissionManager: AGPermissionManager) {
         self.permissionManager = permissionManager
     }
 
     deinit {
-        if captureSession.isRunning {
-            captureSession.stopRunning()
-        }
+        worker.stopSession { _ in }
     }
 
     func setupSession(for position: AVCaptureDevice.Position, preset: AVCaptureSession.Preset = .photo) async throws {
@@ -39,40 +29,128 @@ public class AGSessionManager {
             throw CameraError.permissionDenied
         }
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            sessionQueue.async { [weak self] in
-                guard let self = self else {
-                    continuation.resume(throwing: CameraError.setupFailed)
+        try await worker.setupSession(
+            for: position,
+            preset: preset,
+            includeAudio: permissionManager.isMicrophoneAuthorized
+        )
+    }
+
+    func ensureAudioInput() async throws {
+        try await worker.ensureAudioInput()
+    }
+
+    func startSession(completion: @escaping @Sendable (Bool) -> Void) {
+        worker.startSession(completion: completion)
+    }
+
+    func stopSession(completion: @escaping @Sendable (Bool) -> Void) {
+        worker.stopSession(completion: completion)
+    }
+
+    func setPhotoQualityPrioritization(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) {
+        worker.setPhotoQualityPrioritization(prioritization)
+    }
+
+    func setSessionPreset(_ preset: AVCaptureSession.Preset) throws {
+        try worker.setSessionPreset(preset)
+    }
+
+    func switchCamera(to newPosition: AVCaptureDevice.Position) async throws {
+        guard !isSwitchingCamera else { return }
+        isSwitchingCamera = true
+        defer { isSwitchingCamera = false }
+        try await worker.switchCamera(to: newPosition)
+    }
+}
+
+// The serial queue owns every mutation of the capture session graph and stored references.
+// Remove @unchecked Sendable when AVFoundation provides a Sendable session abstraction.
+private final class CameraSessionWorker: @unchecked Sendable {
+    private static let logger = Logger(subsystem: "com.agcamera", category: "SessionWorker")
+
+    let captureSession = AVCaptureSession()
+    private let queue = DispatchQueue(label: "com.agcamera.sessionQueue")
+
+    private var storedVideoDeviceInput: AVCaptureDeviceInput?
+    private var storedAudioDeviceInput: AVCaptureDeviceInput?
+    private var storedPhotoOutput: AVCapturePhotoOutput?
+    private var storedMovieFileOutput: AVCaptureMovieFileOutput?
+    private var storedCurrentDevice: AVCaptureDevice?
+    private var storedCurrentPosition: AVCaptureDevice.Position = .back
+    private var storedIsConfigured = false
+
+    var videoDeviceInput: AVCaptureDeviceInput? { queue.sync { storedVideoDeviceInput } }
+    var audioDeviceInput: AVCaptureDeviceInput? { queue.sync { storedAudioDeviceInput } }
+    var photoOutput: AVCapturePhotoOutput? { queue.sync { storedPhotoOutput } }
+    var movieFileOutput: AVCaptureMovieFileOutput? { queue.sync { storedMovieFileOutput } }
+    var currentDevice: AVCaptureDevice? { queue.sync { storedCurrentDevice } }
+    var currentPosition: AVCaptureDevice.Position { queue.sync { storedCurrentPosition } }
+    var isConfigured: Bool { queue.sync { storedIsConfigured } }
+
+    func setupSession(
+        for position: AVCaptureDevice.Position,
+        preset: AVCaptureSession.Preset,
+        includeAudio: Bool
+    ) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                guard !self.storedIsConfigured else {
+                    continuation.resume()
                     return
                 }
 
+                let originalPreset = self.captureSession.sessionPreset
+                self.captureSession.beginConfiguration()
+
                 do {
-                    self.captureSession.beginConfiguration()
-
-                    // Map 4:3 presets to 16:9 equivalents to prevent stretching
-                    let adjustedPreset: AVCaptureSession.Preset
-                    switch preset {
-                    case .photo:
-                        adjustedPreset = .hd1920x1080
-                    case .high:
-                        adjustedPreset = .hd1920x1080
-                    default:
-                        adjustedPreset = preset
+                    guard self.captureSession.canSetSessionPreset(preset) else {
+                        throw CameraError.invalidConfiguration
                     }
-
-                    if self.captureSession.canSetSessionPreset(adjustedPreset) {
-                        self.captureSession.sessionPreset = adjustedPreset
-                    } else if self.captureSession.canSetSessionPreset(preset) {
-                        self.captureSession.sessionPreset = preset
-                    }
-
-                    try self.setupVideoInput(for: position)
+                    self.captureSession.sessionPreset = preset
+                    try self.replaceVideoInput(for: position)
                     try self.setupPhotoOutput()
                     try self.setupMovieOutput()
-                    try? self.setupAudioInput()
 
-                    self.currentPosition = position
+                    if includeAudio {
+                        do {
+                            try self.setupAudioInput()
+                        } catch {
+                            Self.logger.warning("Microphone input unavailable: \(error.localizedDescription)")
+                        }
+                    }
 
+                    self.storedCurrentPosition = position
+                    self.storedIsConfigured = true
+                    self.captureSession.commitConfiguration()
+                    continuation.resume()
+                } catch {
+                    self.removePartialConfiguration()
+                    if self.captureSession.canSetSessionPreset(originalPreset) {
+                        self.captureSession.sessionPreset = originalPreset
+                    }
+                    self.captureSession.commitConfiguration()
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func ensureAudioInput() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard self.storedIsConfigured else {
+                    continuation.resume(throwing: CameraError.setupFailed)
+                    return
+                }
+                guard self.storedAudioDeviceInput == nil else {
+                    continuation.resume()
+                    return
+                }
+
+                self.captureSession.beginConfiguration()
+                do {
+                    try self.setupAudioInput()
                     self.captureSession.commitConfiguration()
                     continuation.resume()
                 } catch {
@@ -83,168 +161,148 @@ public class AGSessionManager {
         }
     }
 
-    func startSession() {
-        sessionQueue.async { [weak self] in
-            guard let self = self else { return }
-            if !self.captureSession.isRunning {
+    func startSession(completion: @escaping @Sendable (Bool) -> Void) {
+        queue.async {
+            if self.storedIsConfigured && !self.captureSession.isRunning {
                 self.captureSession.startRunning()
             }
+            completion(self.captureSession.isRunning)
         }
     }
 
-    func stopSession() {
-        sessionQueue.async { [weak self] in
-            guard let self = self else { return }
+    func stopSession(completion: @escaping @Sendable (Bool) -> Void) {
+        queue.async {
             if self.captureSession.isRunning {
                 self.captureSession.stopRunning()
             }
+            completion(self.captureSession.isRunning)
         }
     }
 
     func setPhotoQualityPrioritization(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) {
-        photoOutput?.maxPhotoQualityPrioritization = prioritization
+        queue.async {
+            self.storedPhotoOutput?.maxPhotoQualityPrioritization = prioritization
+        }
+    }
+
+    func setSessionPreset(_ preset: AVCaptureSession.Preset) throws {
+        guard queue.sync(execute: { captureSession.canSetSessionPreset(preset) }) else {
+            throw CameraError.invalidConfiguration
+        }
+        queue.async {
+            self.captureSession.beginConfiguration()
+            self.captureSession.sessionPreset = preset
+            self.captureSession.commitConfiguration()
+        }
     }
 
     func switchCamera(to newPosition: AVCaptureDevice.Position) async throws {
-        if isSwitchingCamera {
-            Self.logger.warning("⚠️ Camera switch blocked - already in progress")
-            return
-        }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard self.storedIsConfigured else {
+                    continuation.resume(throwing: CameraError.setupFailed)
+                    return
+                }
 
-        Self.logger.info("📷 Starting camera switch to: \(newPosition == .front ? "front" : "back")")
-        isSwitchingCamera = true
-
-        do {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                sessionQueue.async { [weak self] in
-                    guard let self = self else {
-                        continuation.resume(throwing: CameraError.setupFailed)
-                        return
-                    }
-
-                    do {
-                        self.captureSession.beginConfiguration()
-                        try self.setupVideoInput(for: newPosition)
-                        self.currentPosition = newPosition
-                        self.captureSession.commitConfiguration()
-                        Self.logger.info("✅ Camera switch completed successfully")
-                        continuation.resume()
-                    } catch {
-                        self.captureSession.commitConfiguration()
-                        Self.logger.error("❌ Camera switch failed: \(error.localizedDescription)")
-                        continuation.resume(throwing: error)
-                    }
+                self.captureSession.beginConfiguration()
+                do {
+                    try self.replaceVideoInput(for: newPosition)
+                    self.storedCurrentPosition = newPosition
+                    self.captureSession.commitConfiguration()
+                    continuation.resume()
+                } catch {
+                    self.captureSession.commitConfiguration()
+                    continuation.resume(throwing: error)
                 }
             }
-            isSwitchingCamera = false
-        } catch {
-            isSwitchingCamera = false
-            throw error
         }
     }
 
-    private func setupVideoInput(for position: AVCaptureDevice.Position) throws {
-        if let currentInput = videoDeviceInput {
-            captureSession.removeInput(currentInput)
-        }
-
+    private func replaceVideoInput(for position: AVCaptureDevice.Position) throws {
         guard let camera = getCamera(for: position) else {
             throw CameraError.cameraNotAvailable
         }
+        let replacement = try AVCaptureDeviceInput(device: camera)
+        let previous = storedVideoDeviceInput
 
-        let videoInput = try AVCaptureDeviceInput(device: camera)
+        if let previous {
+            captureSession.removeInput(previous)
+        }
 
-        guard captureSession.canAddInput(videoInput) else {
+        guard captureSession.canAddInput(replacement) else {
+            if let previous, captureSession.canAddInput(previous) {
+                captureSession.addInput(previous)
+            } else {
+                storedVideoDeviceInput = nil
+                storedCurrentDevice = nil
+                storedIsConfigured = false
+            }
             throw CameraError.setupFailed
         }
 
-        captureSession.addInput(videoInput)
-        videoDeviceInput = videoInput
-        currentDevice = camera
-
-        // Log format dimensions for debugging
-        let dimensions = CMVideoFormatDescriptionGetDimensions(camera.activeFormat.formatDescription)
-        let aspectRatio = Float(dimensions.width) / Float(dimensions.height)
-        Self.logger.info("Camera \(position == .front ? "FRONT" : "BACK") - Format: \(dimensions.width)x\(dimensions.height), Aspect: \(String(format: "%.2f", aspectRatio)), Zoom multiplier: \(camera.displayVideoZoomFactorMultiplier)")
+        captureSession.addInput(replacement)
+        storedVideoDeviceInput = replacement
+        storedCurrentDevice = camera
     }
 
     private func setupPhotoOutput() throws {
+        guard storedPhotoOutput == nil else { return }
         let output = AVCapturePhotoOutput()
-
         guard captureSession.canAddOutput(output) else {
             throw CameraError.setupFailed
         }
-
         captureSession.addOutput(output)
-        photoOutput = output
+        storedPhotoOutput = output
     }
 
     private func setupMovieOutput() throws {
+        guard storedMovieFileOutput == nil else { return }
         let output = AVCaptureMovieFileOutput()
-
         guard captureSession.canAddOutput(output) else {
             throw CameraError.setupFailed
         }
-
         captureSession.addOutput(output)
-        movieFileOutput = output
+        storedMovieFileOutput = output
     }
 
     private func setupAudioInput() throws {
+        guard storedAudioDeviceInput == nil else { return }
         guard let audioDevice = AVCaptureDevice.default(for: .audio) else {
             throw CameraError.setupFailed
         }
-
-        let audioInput = try AVCaptureDeviceInput(device: audioDevice)
-
-        guard captureSession.canAddInput(audioInput) else {
+        let input = try AVCaptureDeviceInput(device: audioDevice)
+        guard captureSession.canAddInput(input) else {
             throw CameraError.setupFailed
         }
+        captureSession.addInput(input)
+        storedAudioDeviceInput = input
+    }
 
-        captureSession.addInput(audioInput)
-        audioDeviceInput = audioInput
+    private func removePartialConfiguration() {
+        if let output = storedPhotoOutput { captureSession.removeOutput(output) }
+        if let output = storedMovieFileOutput { captureSession.removeOutput(output) }
+        if let input = storedAudioDeviceInput { captureSession.removeInput(input) }
+        if let input = storedVideoDeviceInput { captureSession.removeInput(input) }
+        storedPhotoOutput = nil
+        storedMovieFileOutput = nil
+        storedAudioDeviceInput = nil
+        storedVideoDeviceInput = nil
+        storedCurrentDevice = nil
+        storedIsConfigured = false
     }
 
     private func getCamera(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
-        Self.logger.debug("Searching for camera at position: \(position == .back ? "Back" : "Front")")
-
-        let discoverySession = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [
-                .builtInTripleCamera,
-                .builtInDualWideCamera,
-                .builtInDualCamera,
-                .builtInWideAngleCamera,
-                .builtInUltraWideCamera,
-                .builtInTelephotoCamera
-            ],
-            mediaType: .video,
-            position: position
-        )
-
-        Self.logger.debug("Available devices: \(discoverySession.devices.map { "\($0.deviceType.rawValue) (min: \($0.minAvailableVideoZoomFactor), max: \($0.maxAvailableVideoZoomFactor))" }.joined(separator: ", "))")
-
-        // Priority: DualWide > Triple > Dual > Wide
-        if let device = AVCaptureDevice.default(.builtInDualWideCamera, for: .video, position: position) {
-            Self.logger.info("Selected: Dual Wide Camera")
-            return device
+        let types: [AVCaptureDevice.DeviceType] = [
+            .builtInDualWideCamera,
+            .builtInTripleCamera,
+            .builtInDualCamera,
+            .builtInWideAngleCamera
+        ]
+        for type in types {
+            if let device = AVCaptureDevice.default(type, for: .video, position: position) {
+                return device
+            }
         }
-
-        if let device = AVCaptureDevice.default(.builtInTripleCamera, for: .video, position: position) {
-            Self.logger.info("Selected: Triple Camera")
-            return device
-        }
-
-        if let device = AVCaptureDevice.default(.builtInDualCamera, for: .video, position: position) {
-            Self.logger.info("Selected: Dual Camera")
-            return device
-        }
-
-        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) {
-            Self.logger.info("Selected: Wide Camera")
-            return device
-        }
-
-        Self.logger.error("No camera found")
         return nil
     }
 }

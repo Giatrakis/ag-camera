@@ -16,15 +16,18 @@ struct AGCameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
     let videoGravity: AVLayerVideoGravity
     let cameraPosition: AVCaptureDevice.Position
+    let onTapToFocus: ((CGPoint, CGPoint) -> Void)?
 
     init(
         session: AVCaptureSession,
         videoGravity: AVLayerVideoGravity,
-        cameraPosition: AVCaptureDevice.Position
+        cameraPosition: AVCaptureDevice.Position,
+        onTapToFocus: ((CGPoint, CGPoint) -> Void)?
     ) {
         self.session = session
         self.videoGravity = videoGravity
         self.cameraPosition = cameraPosition
+        self.onTapToFocus = onTapToFocus
     }
 
     func makeUIView(context: Context) -> PreviewView {
@@ -32,10 +35,7 @@ struct AGCameraPreview: UIViewRepresentable {
         view.previewLayer.session = session
         view.previewLayer.videoGravity = videoGravity
         view.cameraPosition = cameraPosition
-        view.orientationUpdateHandler = { [weak view] in
-            guard let view = view else { return }
-            self.updateMirroring(for: view)
-        }
+        view.onTapToFocus = onTapToFocus
         updateMirroring(for: view)
         return view
     }
@@ -44,6 +44,7 @@ struct AGCameraPreview: UIViewRepresentable {
         uiView.previewLayer.session = session
         uiView.previewLayer.videoGravity = videoGravity
         uiView.cameraPosition = cameraPosition
+        uiView.onTapToFocus = onTapToFocus
         updateMirroring(for: uiView)
     }
 
@@ -58,8 +59,8 @@ struct AGCameraPreview: UIViewRepresentable {
     }
 
     class PreviewView: UIView {
-        var orientationUpdateHandler: (() -> Void)?
         var cameraPosition: AVCaptureDevice.Position = .back
+        var onTapToFocus: ((CGPoint, CGPoint) -> Void)?
 
         var previewLayer: AVCaptureVideoPreviewLayer {
             guard let previewLayer = layer as? AVCaptureVideoPreviewLayer else {
@@ -87,6 +88,14 @@ struct AGCameraPreview: UIViewRepresentable {
 
         private func setupView() {
             backgroundColor = .black
+            addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap(_:))))
+        }
+
+        @objc private func handleTap(_ recognizer: UITapGestureRecognizer) {
+            guard let onTapToFocus else { return }
+            let location = recognizer.location(in: self)
+            let devicePoint = previewLayer.captureDevicePointConverted(fromLayerPoint: location)
+            onTapToFocus(location, devicePoint)
         }
 
         override func layoutSubviews() {
@@ -94,9 +103,5 @@ struct AGCameraPreview: UIViewRepresentable {
             previewLayer.frame = bounds
         }
 
-        override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-            super.traitCollectionDidChange(previousTraitCollection)
-            orientationUpdateHandler?()
-        }
     }
 }

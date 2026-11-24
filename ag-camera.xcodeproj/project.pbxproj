@@ -62,6 +62,11 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
+		0A6C4D810000000000000001 /* AGCameraTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Tests/AGCameraTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +100,7 @@
 			isa = PBXGroup;
 			children = (
 				FAE0B3D52EBADCB000021FC6 /* Sources */,
+				0A6C4D810000000000000001 /* AGCameraTests */,
 				FAD35F142EB4E8E9004AF78D /* ag-camera-app */,
 				FAD35EEE2EB4E2F0004AF78D /* Products */,
 			);
@@ -159,6 +165,9 @@
 			);
 			dependencies = (
 				FAD35EFB2EB4E2F0004AF78D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				0A6C4D810000000000000001 /* AGCameraTests */,
 			);
 			name = "ag-cameraTests";
 			packageProductDependencies = (

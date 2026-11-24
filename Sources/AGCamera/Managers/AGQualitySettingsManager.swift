@@ -37,22 +37,11 @@ class AGQualitySettingsManager {
     }
 
     func setSessionPreset(_ preset: AVCaptureSession.Preset) throws {
-        guard sessionManager.captureSession.canSetSessionPreset(preset) else {
-            throw CameraError.invalidConfiguration
-        }
-
-        sessionManager.sessionQueue.async { [weak sessionManager] in
-            guard let sessionManager = sessionManager else { return }
-
-            sessionManager.captureSession.beginConfiguration()
-            sessionManager.captureSession.sessionPreset = preset
-            sessionManager.captureSession.commitConfiguration()
-        }
+        try sessionManager.setSessionPreset(preset)
     }
 
     func setPhotoQualityPrioritization(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) {
-        guard let photoOutput = sessionManager.photoOutput else { return }
-        photoOutput.maxPhotoQualityPrioritization = prioritization
+        sessionManager.setPhotoQualityPrioritization(prioritization)
     }
 
     func setVideoStabilizationMode(_ mode: AVCaptureVideoStabilizationMode) {

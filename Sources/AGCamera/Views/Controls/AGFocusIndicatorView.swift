@@ -10,7 +10,7 @@ import SwiftUI
 public struct AGFocusIndicatorView: View {
     @State private var animate = false
     
-    public init() {}
+    public nonisolated init() {}
 
     public var body: some View {
         Rectangle()

@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 
+@MainActor
 public struct AGCameraConfiguration {
     public var handlePermissions: Bool
     public var showDefaultControls: Bool

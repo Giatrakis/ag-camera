@@ -1,12 +1,10 @@
 // swift-tools-version: 6.0
-// The swift-tools-version declares the minimum version of Swift required to build this package.
-
 import PackageDescription
 
 let package = Package(
     name: "ag-camera",
     platforms: [
-        .iOS(.v18)
+        .iOS("26.0")
     ],
     products: [
         .library(
@@ -22,6 +20,11 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]
+        ),
+        .testTarget(
+            name: "AGCameraTests",
+            dependencies: ["AGCamera"],
+            path: "Tests/AGCameraTests"
         )
     ]
 )

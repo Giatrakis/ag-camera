@@ -87,9 +87,6 @@ class AGCaptureManager: NSObject {
         }
 
         let task = Task<URL, Error> {
-            self.isRecording = true
-            self.onRecordingStateChanged?(true, 0.0)
-
             return try await withCheckedThrowingContinuation { continuation in
                 self.videoRecordingStartCompletion = { result in
                     continuation.resume(with: result)
@@ -175,6 +172,7 @@ extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
+        let imageData = photo.fileDataRepresentation()
         Task { @MainActor in
             if let error = error {
                 photoCaptureCompletion?(.failure(error))
@@ -182,7 +180,7 @@ extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
                 return
             }
 
-            guard let imageData = photo.fileDataRepresentation() else {
+            guard let imageData else {
                 photoCaptureCompletion?(.failure(CameraError.captureFailed))
                 photoCaptureCompletion = nil
                 return
@@ -196,12 +194,14 @@ extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
 
 extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
 
-    func fileOutput(
+    nonisolated func fileOutput(
         _ output: AVCaptureFileOutput,
         didStartRecordingTo fileURL: URL,
         from connections: [AVCaptureConnection]
     ) {
         Task { @MainActor in
+            self.isRecording = true
+            self.onRecordingStateChanged?(true, 0.0)
             self.recordingStartTime = Date()
             self.recordingDuration = 0.0
 
@@ -214,7 +214,7 @@ extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
         }
     }
 
-    func fileOutput(
+    nonisolated func fileOutput(
         _ output: AVCaptureFileOutput,
         didFinishRecordingTo outputFileURL: URL,
         from connections: [AVCaptureConnection],
@@ -231,6 +231,11 @@ extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
             self.onRecordingStateChanged?(false, 0.0)
 
             Self.logger.info("Recording stopped. Duration was: \(String(format: "%.1f", finalDuration))s")
+
+            if self.videoRecordingStartCompletion != nil {
+                self.videoRecordingStartCompletion?(.failure(error ?? CameraError.recordingFailed))
+                self.videoRecordingStartCompletion = nil
+            }
 
             if let error = error {
                 self.videoRecordingStopCompletion?(.failure(error))
