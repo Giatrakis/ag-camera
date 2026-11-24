@@ -25,6 +25,9 @@ public class AGCameraManager: NSObject {
     public private(set) var minZoomFactor: CGFloat = 1.0
     public private(set) var maxZoomFactor: CGFloat = 1.0
     public private(set) var availableZoomLevels: [CGFloat] = [1.0]
+    public private(set) var currentExposureBias: Float = 0
+    public private(set) var minExposureBias: Float = 0
+    public private(set) var maxExposureBias: Float = 0
     public private(set) var isTorchOn = false
     public private(set) var isSwitchingCamera = false
     public var outputType: AGOutputType = .photo
@@ -147,6 +150,13 @@ public class AGCameraManager: NSObject {
         )
         availableZoomLevels = zoomManager.getAvailableZoomLevels(maximumZoomFactor: configuredZoomMaximum)
     }
+
+    private func refreshExposureBiasState() async throws {
+        let state = try await focusExposure.exposureBiasState()
+        currentExposureBias = state.current
+        minExposureBias = state.minimum
+        maxExposureBias = state.maximum
+    }
 }
 
 // MARK: - Session Management
@@ -197,6 +207,7 @@ extension AGCameraManager {
                 maximumZoomFactor: configuredZoomMaximum
             )
             refreshZoomState()
+            try await refreshExposureBiasState()
 
             isSessionConfigured = true
             self.error = nil
@@ -436,6 +447,7 @@ extension AGCameraManager {
                 await qualitySettings.applyVideoStabilizationMode()
             }
             refreshZoomState()
+            try await refreshExposureBiasState()
             onCameraPositionChanged?(newPosition)
             onZoomChanged?(currentZoomFactor)
             if !zoomState.didApplyDeviceSettings {
@@ -533,8 +545,17 @@ extension AGCameraManager {
         try await focusExposure.setExposure(at: point)
     }
 
+    public func setExposureBias(_ bias: Float) async throws {
+        guard !isSwitchingCamera else { throw CameraError.cameraSwitchInProgress }
+        currentExposureBias = try await focusExposure.setExposureBias(bias)
+    }
+
     public func setFocusAndExposure(at point: CGPoint) async throws {
-        try await focusExposure.setFocusAndExposure(at: point)
+        currentExposureBias = try await focusExposure.setFocusAndExposure(at: point)
+    }
+
+    func focusAndResetExposure(at point: CGPoint) async throws {
+        currentExposureBias = try await focusExposure.setFocusAndExposure(at: point, resetExposureBias: true)
     }
 
     public func setFocusMode(_ mode: AVCaptureDevice.FocusMode) async throws {

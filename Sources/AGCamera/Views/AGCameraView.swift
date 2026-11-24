@@ -15,8 +15,13 @@ public struct AGCameraView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var focusPoint: CGPoint?
+    @State private var focusRequestID = UUID()
     @State private var showFocusIndicator = false
     @State private var focusTask: Task<Void, Never>?
+    @State private var exposureTask: Task<Void, Never>?
+    @State private var exposureDragStartBias: Float?
+    @State private var pendingExposureBias: Float?
+    @State private var displayedExposureBias: Float = 0
     @State private var zoomTask: Task<Void, Never>?
     @State private var visibleVideoRect = CGRect.zero
 
@@ -74,6 +79,12 @@ public struct AGCameraView: View {
             zoomChangedAction?(newValue)
         }
         .onChange(of: manager.currentCameraPosition) { _, newValue in
+            focusRequestID = UUID()
+            focusTask?.cancel()
+            exposureTask?.cancel()
+            pendingExposureBias = nil
+            exposureDragStartBias = nil
+            showFocusIndicator = false
             cameraPositionChangedAction?(newValue)
         }
         .onChange(of: manager.flashMode) { _, newValue in
@@ -101,8 +112,11 @@ public struct AGCameraView: View {
             await setupCamera()
         }
         .onDisappear {
+            focusRequestID = UUID()
             zoomTask?.cancel()
             focusTask?.cancel()
+            exposureTask?.cancel()
+            pendingExposureBias = nil
             manager.handleAppBackground()
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -158,6 +172,15 @@ public struct AGCameraView: View {
                     }
                 }
         )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 12)
+                .onChanged(handleExposureDragChanged)
+                .onEnded { _ in
+                    guard exposureDragStartBias != nil else { return }
+                    exposureDragStartBias = nil
+                    scheduleFocusIndicatorDismissal()
+                }
+        )
         .overlay { transitionSnapshotOverlay }
         .overlay {
             Color.black
@@ -176,15 +199,31 @@ public struct AGCameraView: View {
     @ViewBuilder
     private var focusIndicatorOverlay: some View {
         if showFocusIndicator, let point = focusPoint, !visibleVideoRect.isEmpty {
-            displayedConfiguration.focusIndicator
-                .position(
-                    x: point.x - visibleVideoRect.minX,
-                    y: point.y - visibleVideoRect.minY
-                )
-                .frame(width: visibleVideoRect.width, height: visibleVideoRect.height)
-                .clipped()
-                .offset(x: visibleVideoRect.minX, y: visibleVideoRect.minY)
-                .allowsHitTesting(false)
+            ZStack {
+                displayedConfiguration.focusIndicator
+                    .position(
+                        x: point.x - visibleVideoRect.minX,
+                        y: point.y - visibleVideoRect.minY
+                    )
+
+                if displayedConfiguration.tapToFocusBehavior == .focusAndExposure,
+                   manager.maxExposureBias > manager.minExposureBias {
+                    Capsule()
+                        .fill(.yellow.opacity(0.8))
+                        .frame(width: 1, height: 70)
+                        .position(x: exposureSunX(for: point), y: point.y - visibleVideoRect.minY)
+
+                    Image(systemName: "sun.max.fill")
+                        .font(.title3)
+                        .foregroundStyle(.yellow)
+                        .shadow(color: .black.opacity(0.7), radius: 2)
+                        .position(x: exposureSunX(for: point), y: exposureSunY(for: point))
+                }
+            }
+            .frame(width: visibleVideoRect.width, height: visibleVideoRect.height)
+            .clipped()
+            .offset(x: visibleVideoRect.minX, y: visibleVideoRect.minY)
+            .allowsHitTesting(false)
         }
     }
 
@@ -314,9 +353,19 @@ private extension AGCameraView {
     }
 
     private func handleTapToFocus(at location: CGPoint, devicePoint: CGPoint) {
+        let requestID = UUID()
+        focusRequestID = requestID
         focusTask?.cancel()
+        let previousExposureTask = exposureTask
+        exposureTask?.cancel()
+        exposureTask = nil
+        pendingExposureBias = nil
+        exposureDragStartBias = nil
+        showFocusIndicator = false
         let behavior = displayedConfiguration.tapToFocusBehavior
         Task {
+            await previousExposureTask?.value
+            guard focusRequestID == requestID, !manager.isSwitchingCamera else { return }
             do {
                 switch behavior {
                 case .none:
@@ -324,19 +373,71 @@ private extension AGCameraView {
                 case .focusOnly:
                     try await manager.setFocus(at: devicePoint)
                 case .focusAndExposure:
-                    try await manager.setFocusAndExposure(at: devicePoint)
+                    try await manager.focusAndResetExposure(at: devicePoint)
                 }
+                guard focusRequestID == requestID, !manager.isSwitchingCamera else { return }
                 focusPoint = location
+                displayedExposureBias = manager.currentExposureBias
                 showFocusIndicator = true
-                focusTask = Task {
-                    try? await Task.sleep(for: .seconds(1))
-                    guard !Task.isCancelled else { return }
-                    withAnimation { showFocusIndicator = false }
-                }
+                scheduleFocusIndicatorDismissal()
             } catch {
                 present(error)
             }
         }
+    }
+
+    private func handleExposureDragChanged(_ value: DragGesture.Value) {
+        guard manager.isSessionRunning, !manager.isSwitchingCamera,
+              displayedConfiguration.tapToFocusBehavior == .focusAndExposure,
+              showFocusIndicator, focusPoint != nil,
+              visibleVideoRect.contains(value.startLocation),
+              manager.maxExposureBias > manager.minExposureBias else { return }
+
+        if exposureDragStartBias == nil {
+            exposureDragStartBias = manager.currentExposureBias
+            focusTask?.cancel()
+        }
+        guard let startBias = exposureDragStartBias else { return }
+        let requestedBias = startBias - Float(value.translation.height / 120)
+        let clampedBias = min(max(requestedBias, manager.minExposureBias), manager.maxExposureBias)
+        guard abs(clampedBias - displayedExposureBias) >= 0.01 else { return }
+        displayedExposureBias = clampedBias
+        pendingExposureBias = clampedBias
+        guard exposureTask == nil else { return }
+        exposureTask = Task {
+            while let bias = pendingExposureBias, !Task.isCancelled {
+                pendingExposureBias = nil
+                do {
+                    try await manager.setExposureBias(bias)
+                } catch {
+                    present(error)
+                    break
+                }
+            }
+            exposureTask = nil
+        }
+    }
+
+    private func scheduleFocusIndicatorDismissal() {
+        focusTask?.cancel()
+        focusTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            withAnimation { showFocusIndicator = false }
+        }
+    }
+
+    private func exposureSunX(for point: CGPoint) -> CGFloat {
+        let localX = point.x - visibleVideoRect.minX
+        let proposedX = localX + (localX + 70 < visibleVideoRect.width ? 60 : -60)
+        return min(max(proposedX, 18), visibleVideoRect.width - 18)
+    }
+
+    private func exposureSunY(for point: CGPoint) -> CGFloat {
+        let localY = point.y - visibleVideoRect.minY
+        let maximumMagnitude = max(abs(manager.minExposureBias), abs(manager.maxExposureBias))
+        let offset = maximumMagnitude > 0 ? CGFloat(displayedExposureBias / maximumMagnitude) * 28 : 0
+        return min(max(localY - offset, 18), visibleVideoRect.height - 18)
     }
 
     private func present(_ error: Error) {

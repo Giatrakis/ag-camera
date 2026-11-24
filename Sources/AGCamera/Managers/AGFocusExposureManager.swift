@@ -1,6 +1,12 @@
 import AVFoundation
 import CoreGraphics
 
+struct AGExposureBiasState: Sendable {
+    let current: Float
+    let minimum: Float
+    let maximum: Float
+}
+
 @MainActor
 final class AGFocusExposureManager {
     private let sessionManager: AGSessionManager
@@ -71,10 +77,39 @@ final class AGFocusExposureManager {
         }
     }
 
-    func setFocusAndExposure(at point: CGPoint) async throws {
+    func exposureBiasState() async throws -> AGExposureBiasState {
+        try await sessionManager.performDeviceOperation { device, _ in
+            AGExposureBiasState(
+                current: device.exposureTargetBias,
+                minimum: device.minExposureTargetBias,
+                maximum: device.maxExposureTargetBias
+            )
+        }
+    }
+
+    func setExposureBias(_ bias: Float) async throws -> Float {
+        guard bias.isFinite else { throw CameraError.invalidConfiguration }
+        return try await sessionManager.performDeviceOperation { device, _ in
+            guard device.exposureMode != .custom else { throw CameraError.invalidConfiguration }
+            let clampedBias = min(max(bias, device.minExposureTargetBias), device.maxExposureTargetBias)
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            device.setExposureTargetBias(clampedBias, completionHandler: nil)
+            return clampedBias
+        }
+    }
+
+    func setFocusAndExposure(at point: CGPoint, resetExposureBias: Bool = false) async throws -> Float {
         try await sessionManager.performDeviceOperation { device, _ in
             try device.lockForConfiguration()
             defer { device.unlockForConfiguration() }
+            let bias: Float
+            if resetExposureBias {
+                bias = min(max(0, device.minExposureTargetBias), device.maxExposureTargetBias)
+                device.setExposureTargetBias(bias, completionHandler: nil)
+            } else {
+                bias = device.exposureTargetBias
+            }
             if device.isFocusPointOfInterestSupported {
                 device.focusPointOfInterest = point
                 device.focusMode = .autoFocus
@@ -83,6 +118,7 @@ final class AGFocusExposureManager {
                 device.exposurePointOfInterest = point
                 device.exposureMode = .autoExpose
             }
+            return bias
         }
     }
 
