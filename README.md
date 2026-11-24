@@ -43,4 +43,4 @@ See [USAGE.md](USAGE.md) for configuration, custom controls, and the manager API
 
 ## Current scope
 
-The package supports one active capture session with still photos and movie-file recordings. It does not yet provide a full camera product surface such as an in-app media browser, capture format selection, or a processing pipeline. The host app owns its permission descriptions and captured media handling. `AGCameraView` presents camera errors in an alert.
+The package supports one active capture session with still photos and video recordings that can switch between front and back cameras. Video and microphone samples are written to one movie file; the video may briefly hold a frame while the camera input changes. It does not yet provide a full camera product surface such as an in-app media browser, capture format selection, or a processing pipeline. The host app owns its permission descriptions and captured media handling. `AGCameraView` presents camera errors in an alert.

@@ -10,12 +10,11 @@ class AGCaptureManager: NSObject {
 
     private let sessionManager: AGSessionManager
     private let log: AGCameraLog
+    private let videoRecorder: AGVideoRecordingWriter
     private var photoCaptureCompletion: ((Result<Data, Error>) -> Void)?
     private var photoProcessingResult: Result<Data, Error>?
     private var photoCaptureTask: Task<Data, Error>?
-    private var videoRecordingStartCompletion: ((Result<URL, Error>) -> Void)?
     private var videoRecordingStartTask: Task<URL, Error>?
-    private var videoRecordingStopCompletion: ((Result<URL, Error>) -> Void)?
     private var videoRecordingStopTask: Task<URL, Error>?
 
     var flashMode: AVCaptureDevice.FlashMode = .off
@@ -29,10 +28,13 @@ class AGCaptureManager: NSObject {
     private var recordingStartTime: Date?
 
     var onRecordingStateChanged: ((Bool, TimeInterval) -> Void)?
+    var recordingVideoOutput: AVCaptureVideoDataOutput { videoRecorder.videoOutput }
+    var recordingAudioOutput: AVCaptureAudioDataOutput { videoRecorder.audioOutput }
 
     init(sessionManager: AGSessionManager, log: AGCameraLog) {
         self.sessionManager = sessionManager
         self.log = log
+        self.videoRecorder = AGVideoRecordingWriter(log: log)
         super.init()
     }
 
@@ -77,49 +79,16 @@ class AGCaptureManager: NSObject {
     }
 
     func startVideoRecording() async throws -> URL {
-        guard let movieFileOutput = sessionManager.movieFileOutput else {
-            throw CameraError.recordingFailed
-        }
-
-        guard movieFileOutput.connection(with: .audio) != nil else {
-            throw CameraError.recordingFailed
-        }
-
-        guard !movieFileOutput.isRecording else {
-            throw CameraError.recordingFailed
-        }
-
-        // If start already in progress, return the existing task result
         if let existingTask = videoRecordingStartTask {
             return try await existingTask.value
         }
-
-        guard let videoConnection = movieFileOutput.connection(with: .video) else {
+        guard !isRecording,
+              recordingVideoOutput.connection(with: .video) != nil,
+              recordingAudioOutput.connection(with: .audio) != nil else {
             throw CameraError.recordingFailed
         }
-
-        if let videoCodec {
-            guard movieFileOutput.supportedOutputSettingsKeys(for: videoConnection).contains(AVVideoCodecKey),
-                  movieFileOutput.availableVideoCodecTypes.contains(videoCodec) else {
-                throw CameraError.invalidConfiguration
-            }
-            movieFileOutput.setOutputSettings([AVVideoCodecKey: videoCodec], for: videoConnection)
-        } else {
-            movieFileOutput.setOutputSettings(nil, for: videoConnection)
-        }
-
         let task = Task<URL, Error> {
-            return try await withCheckedThrowingContinuation { continuation in
-                self.videoRecordingStartCompletion = { result in
-                    continuation.resume(with: result)
-                }
-
-                let outputURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(UUID().uuidString)
-                    .appendingPathExtension("mov")
-
-                movieFileOutput.startRecording(to: outputURL, recordingDelegate: self)
-            }
+            try await videoRecorder.start(codec: videoCodec)
         }
 
         videoRecordingStartTask = task
@@ -127,6 +96,12 @@ class AGCaptureManager: NSObject {
         do {
             let result = try await task.value
             videoRecordingStartTask = nil
+            isRecording = true
+            recordingStartTime = Date()
+            recordingDuration = 0
+            onRecordingStateChanged?(true, 0)
+            startRecordingDurationTracking()
+            log.info("Recording started at: \(result)", category: "CaptureManager")
             return result
         } catch {
             videoRecordingStartTask = nil
@@ -135,39 +110,38 @@ class AGCaptureManager: NSObject {
     }
 
     func stopVideoRecording() async throws -> URL {
-        guard let movieFileOutput = sessionManager.movieFileOutput else {
-            throw CameraError.recordingFailed
-        }
-
-        guard movieFileOutput.isRecording else {
-            throw CameraError.recordingFailed
-        }
-
-        // If stop already in progress, return the existing task result
         if let existingTask = videoRecordingStopTask {
             return try await existingTask.value
         }
-
-        let task = Task<URL, Error> {
-            try await withCheckedThrowingContinuation { continuation in
-                self.videoRecordingStopCompletion = { result in
-                    continuation.resume(with: result)
-                }
-
-                movieFileOutput.stopRecording()
-            }
-        }
+        guard isRecording else { throw CameraError.recordingFailed }
+        let task = Task<URL, Error> { try await videoRecorder.stop() }
 
         videoRecordingStopTask = task
 
         do {
             let result = try await task.value
             videoRecordingStopTask = nil
+            finishRecordingDurationTracking()
+            log.info("Recording stopped at: \(result)", category: "CaptureManager")
             return result
         } catch {
             videoRecordingStopTask = nil
+            finishRecordingDurationTracking()
             throw error
         }
+    }
+
+    func setRecordingVideoPaused(_ paused: Bool) async {
+        await videoRecorder.setVideoPaused(paused)
+    }
+
+    private func finishRecordingDurationTracking() {
+        recordingTimerTask?.cancel()
+        recordingTimerTask = nil
+        recordingStartTime = nil
+        isRecording = false
+        recordingDuration = 0
+        onRecordingStateChanged?(false, 0)
     }
 
     private func updateRecordingDuration() {
@@ -228,61 +202,6 @@ extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
             )
             self.photoProcessingResult = nil
             completion(result)
-        }
-    }
-}
-
-extension AGCaptureManager: AVCaptureFileOutputRecordingDelegate {
-
-    nonisolated func fileOutput(
-        _ output: AVCaptureFileOutput,
-        didStartRecordingTo fileURL: URL,
-        from connections: [AVCaptureConnection]
-    ) {
-        Task { @MainActor in
-            self.isRecording = true
-            self.onRecordingStateChanged?(true, 0.0)
-            self.recordingStartTime = Date()
-            self.recordingDuration = 0.0
-
-            self.startRecordingDurationTracking()
-
-            self.log.info("Recording started at: \(fileURL)", category: "CaptureManager")
-
-            self.videoRecordingStartCompletion?(.success(fileURL))
-            self.videoRecordingStartCompletion = nil
-        }
-    }
-
-    nonisolated func fileOutput(
-        _ output: AVCaptureFileOutput,
-        didFinishRecordingTo outputFileURL: URL,
-        from connections: [AVCaptureConnection],
-        error: Error?
-    ) {
-        Task { @MainActor in
-            self.recordingTimerTask?.cancel()
-            self.recordingTimerTask = nil
-            self.recordingStartTime = nil
-
-            let finalDuration = self.recordingDuration
-            self.isRecording = false
-            self.recordingDuration = 0.0
-            self.onRecordingStateChanged?(false, 0.0)
-
-            self.log.info("Recording stopped. Duration was: \(String(format: "%.1f", finalDuration))s", category: "CaptureManager")
-
-            if self.videoRecordingStartCompletion != nil {
-                self.videoRecordingStartCompletion?(.failure(error ?? CameraError.recordingFailed))
-                self.videoRecordingStartCompletion = nil
-            }
-
-            if let error = error {
-                self.videoRecordingStopCompletion?(.failure(error))
-            } else {
-                self.videoRecordingStopCompletion?(.success(outputFileURL))
-            }
-            self.videoRecordingStopCompletion = nil
         }
     }
 }

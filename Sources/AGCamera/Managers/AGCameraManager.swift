@@ -18,6 +18,7 @@ public class AGCameraManager: NSObject {
     public private(set) var isSessionConfigured = false
     public private(set) var error: CameraError?
     public private(set) var isRecording = false
+    public private(set) var isPreparingVideoRecording = false
     public private(set) var recordingDuration: TimeInterval = 0.0
     public private(set) var currentZoomFactor: CGFloat = 1.0
     public private(set) var lastZoomFactor: CGFloat = 1.0
@@ -309,6 +310,9 @@ extension AGCameraManager {
             log.warning("Video recording blocked - camera switch in progress", category: "CameraManager")
             throw CameraError.cameraSwitchInProgress
         }
+        guard !isPreparingVideoRecording else { throw CameraError.recordingFailed }
+        isPreparingVideoRecording = true
+        defer { isPreparingVideoRecording = false }
 
         let savedZoom = currentZoomFactor
 
@@ -317,7 +321,11 @@ extension AGCameraManager {
             throw CameraError.microphonePermissionDenied
         }
         do {
-            try await sessionManager.prepareVideoRecording(mirrorFrontCamera: configuration.mirrorFrontCamera)
+            try await sessionManager.prepareVideoRecording(
+                videoOutput: captureManager.recordingVideoOutput,
+                audioOutput: captureManager.recordingAudioOutput,
+                mirrorFrontCamera: configuration.mirrorFrontCamera
+            )
         } catch {
             reportError(error, fallback: .recordingFailed)
             throw error
@@ -383,8 +391,16 @@ extension AGCameraManager {
             log.warning("Camera switch blocked - already in progress", category: "CameraManager")
             return
         }
+        guard !isPreparingVideoRecording else {
+            log.warning("Camera switch blocked - recording is starting", category: "CameraManager")
+            return
+        }
 
         isSwitchingCamera = true
+        let wasRecording = isRecording
+        if wasRecording {
+            await captureManager.setRecordingVideoPaused(true)
+        }
 
         do {
             if animated {
@@ -405,9 +421,20 @@ extension AGCameraManager {
                 exposureMode: configuration.defaultExposureMode,
                 mirrorFrontCamera: configuration.mirrorFrontCamera
             )
+            if wasRecording {
+                await captureManager.setRecordingVideoPaused(false)
+            }
 
             currentCameraPosition = newPosition
             isTorchOn = false
+            if isRecording {
+                do {
+                    try await qualitySettings.setFrameRate(fps: configuration.videoFrameRate)
+                } catch {
+                    log.warning("Requested video frame rate is unavailable on the selected camera", category: "CameraManager")
+                }
+                await qualitySettings.applyVideoStabilizationMode()
+            }
             refreshZoomState()
             onCameraPositionChanged?(newPosition)
             onZoomChanged?(currentZoomFactor)
@@ -424,6 +451,9 @@ extension AGCameraManager {
             isSwitchingCamera = false
         } catch {
             isBlurred = false
+            if wasRecording {
+                await captureManager.setRecordingVideoPaused(false)
+            }
             isSwitchingCamera = false
             reportError(error, fallback: .setupFailed)
             throw error

@@ -155,7 +155,9 @@ try await camera.saveVideoToLibrary(url: completedURL)
 
 The start URL and completed URL refer to the recording file. `saveVideoToLibrary(url:)` removes the temporary file after a successful save. The manager does not save photos or videos automatically.
 
-Movie output and microphone input are prepared when recording first starts, so the first recording can take longer to begin than later recordings.
+Video and audio sample outputs and the microphone input are prepared when recording first starts, so the first recording can take longer to begin than later recordings. `switchCamera()` can be called while recording. Audio remains in the same movie file; video may briefly hold the last frame while the camera input changes. Recording does not stop or create separate clips during a switch. Microphone gaps during a switch are filled with silence to preserve audio/video timing. The movie currently stores uncompressed PCM audio, which can increase file size compared with AAC.
+
+With the `.photo` session preset, AVFoundation may deliver preview-sized video sample buffers. Use an explicit video preset such as `.hd1920x1080` when the recorded resolution matters.
 
 ## Camera controls
 
@@ -175,4 +177,4 @@ try await camera.setSessionPreset(.hd1920x1080)
 
 ## Current scope
 
-The SDK currently supports still photos, movie-file recording, a SwiftUI preview with built-in controls, and direct camera settings. It does not provide a media browser, capture format picker, editing pipeline, or automatic persistence. `AGCameraView` displays camera errors in an alert; the host app owns saved media.
+The SDK currently supports still photos, video recording, a SwiftUI preview with built-in controls, and direct camera settings. It does not provide a media browser, capture format picker, editing pipeline, or automatic persistence. `AGCameraView` displays camera errors in an alert; the host app owns saved media.

@@ -13,6 +13,12 @@ private struct QueuedVideoDataOutput: @unchecked Sendable {
     let value: AVCaptureVideoDataOutput
 }
 
+// The session queue alone changes output membership; remove when AVFoundation outputs are Sendable.
+private struct QueuedRecordingOutputs: @unchecked Sendable {
+    let video: AVCaptureVideoDataOutput
+    let audio: AVCaptureAudioDataOutput
+}
+
 @MainActor
 final class AGSessionManager {
     private let worker: CameraSessionWorker
@@ -23,7 +29,6 @@ final class AGSessionManager {
     var videoDeviceInput: AVCaptureDeviceInput? { worker.videoDeviceInput }
     var audioDeviceInput: AVCaptureDeviceInput? { worker.audioDeviceInput }
     var photoOutput: AVCapturePhotoOutput? { worker.photoOutput }
-    var movieFileOutput: AVCaptureMovieFileOutput? { worker.movieFileOutput }
     var currentDevice: AVCaptureDevice? { worker.currentDevice }
     var currentPosition: AVCaptureDevice.Position { worker.currentPosition }
     var isConfigured: Bool { worker.isConfigured }
@@ -50,8 +55,16 @@ final class AGSessionManager {
         )
     }
 
-    func prepareVideoRecording(mirrorFrontCamera: Bool) async throws {
-        try await worker.prepareVideoRecording(mirrorFrontCamera: mirrorFrontCamera)
+    func prepareVideoRecording(
+        videoOutput: AVCaptureVideoDataOutput,
+        audioOutput: AVCaptureAudioDataOutput,
+        mirrorFrontCamera: Bool
+    ) async throws {
+        try await worker.prepareVideoRecording(
+            videoOutput: videoOutput,
+            audioOutput: audioOutput,
+            mirrorFrontCamera: mirrorFrontCamera
+        )
     }
 
     func configureVideoMirroring(for position: AVCaptureDevice.Position, mirrorFrontCamera: Bool) {
@@ -138,7 +151,8 @@ private final class CameraSessionWorker: @unchecked Sendable {
     private var storedVideoDeviceInput: AVCaptureDeviceInput?
     private var storedAudioDeviceInput: AVCaptureDeviceInput?
     private var storedPhotoOutput: AVCapturePhotoOutput?
-    private var storedMovieFileOutput: AVCaptureMovieFileOutput?
+    private var storedRecordingVideoOutput: AVCaptureVideoDataOutput?
+    private var storedRecordingAudioOutput: AVCaptureAudioDataOutput?
     private var storedCurrentDevice: AVCaptureDevice?
     private var storedCurrentPosition: AVCaptureDevice.Position = .back
     private var storedIsConfigured = false
@@ -150,7 +164,6 @@ private final class CameraSessionWorker: @unchecked Sendable {
     var videoDeviceInput: AVCaptureDeviceInput? { queue.sync { storedVideoDeviceInput } }
     var audioDeviceInput: AVCaptureDeviceInput? { queue.sync { storedAudioDeviceInput } }
     var photoOutput: AVCapturePhotoOutput? { queue.sync { storedPhotoOutput } }
-    var movieFileOutput: AVCaptureMovieFileOutput? { queue.sync { storedMovieFileOutput } }
     var currentDevice: AVCaptureDevice? { queue.sync { storedCurrentDevice } }
     var currentPosition: AVCaptureDevice.Position { queue.sync { storedCurrentPosition } }
     var isConfigured: Bool { queue.sync { storedIsConfigured } }
@@ -212,15 +225,21 @@ private final class CameraSessionWorker: @unchecked Sendable {
         }
     }
 
-    func prepareVideoRecording(mirrorFrontCamera: Bool) async throws {
+    func prepareVideoRecording(
+        videoOutput: AVCaptureVideoDataOutput,
+        audioOutput: AVCaptureAudioDataOutput,
+        mirrorFrontCamera: Bool
+    ) async throws {
+        let outputs = QueuedRecordingOutputs(video: videoOutput, audio: audioOutput)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async {
                 guard self.storedIsConfigured else {
                     continuation.resume(throwing: CameraError.setupFailed)
                     return
                 }
-                guard self.storedAudioDeviceInput == nil || self.storedMovieFileOutput == nil else {
-                    if self.storedMovieFileOutput?.connection(with: .audio) != nil {
+                guard self.storedAudioDeviceInput == nil || self.storedRecordingVideoOutput == nil || self.storedRecordingAudioOutput == nil else {
+                    if self.storedRecordingVideoOutput?.connection(with: .video) != nil,
+                       self.storedRecordingAudioOutput?.connection(with: .audio) != nil {
                         continuation.resume()
                     } else {
                         continuation.resume(throwing: CameraError.recordingFailed)
@@ -229,21 +248,28 @@ private final class CameraSessionWorker: @unchecked Sendable {
                 }
 
                 let hadAudioInput = self.storedAudioDeviceInput != nil
-                let hadMovieOutput = self.storedMovieFileOutput != nil
+                let hadVideoOutput = self.storedRecordingVideoOutput != nil
+                let hadAudioOutput = self.storedRecordingAudioOutput != nil
                 self.captureSession.beginConfiguration()
                 do {
                     try self.setupAudioInput()
-                    try self.setupMovieOutput()
+                    try self.setupRecordingVideoOutput(outputs.video)
+                    try self.setupRecordingAudioOutput(outputs.audio)
                     self.captureSession.commitConfiguration()
-                    guard self.storedMovieFileOutput?.connection(with: .audio) != nil else {
+                    guard self.storedRecordingVideoOutput?.connection(with: .video) != nil,
+                          self.storedRecordingAudioOutput?.connection(with: .audio) != nil else {
                         self.captureSession.beginConfiguration()
                         if !hadAudioInput, let input = self.storedAudioDeviceInput {
                             self.captureSession.removeInput(input)
                             self.storedAudioDeviceInput = nil
                         }
-                        if !hadMovieOutput, let output = self.storedMovieFileOutput {
+                        if !hadVideoOutput, let output = self.storedRecordingVideoOutput {
                             self.captureSession.removeOutput(output)
-                            self.storedMovieFileOutput = nil
+                            self.storedRecordingVideoOutput = nil
+                        }
+                        if !hadAudioOutput, let output = self.storedRecordingAudioOutput {
+                            self.captureSession.removeOutput(output)
+                            self.storedRecordingAudioOutput = nil
                         }
                         self.captureSession.commitConfiguration()
                         continuation.resume(throwing: CameraError.recordingFailed)
@@ -259,9 +285,13 @@ private final class CameraSessionWorker: @unchecked Sendable {
                         self.captureSession.removeInput(input)
                         self.storedAudioDeviceInput = nil
                     }
-                    if !hadMovieOutput, let output = self.storedMovieFileOutput {
+                    if !hadVideoOutput, let output = self.storedRecordingVideoOutput {
                         self.captureSession.removeOutput(output)
-                        self.storedMovieFileOutput = nil
+                        self.storedRecordingVideoOutput = nil
+                    }
+                    if !hadAudioOutput, let output = self.storedRecordingAudioOutput {
+                        self.captureSession.removeOutput(output)
+                        self.storedRecordingAudioOutput = nil
                     }
                     self.captureSession.commitConfiguration()
                     continuation.resume(throwing: error)
@@ -303,7 +333,7 @@ private final class CameraSessionWorker: @unchecked Sendable {
     func applyVideoStabilizationMode(_ mode: AVCaptureVideoStabilizationMode) async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             queue.async {
-                if let connection = self.storedMovieFileOutput?.connection(with: .video),
+                if let connection = self.storedRecordingVideoOutput?.connection(with: .video),
                    connection.isVideoStabilizationSupported {
                     connection.preferredVideoStabilizationMode = mode
                 }
@@ -537,7 +567,20 @@ private final class CameraSessionWorker: @unchecked Sendable {
         mirrorFrontCamera: Bool
     ) {
         let shouldMirror = position == .front && mirrorFrontCamera
-        let outputs: [AVCaptureOutput?] = [storedPhotoOutput, storedMovieFileOutput]
+        if let connection = storedRecordingVideoOutput?.connection(with: .video),
+           let device = storedCurrentDevice {
+            let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
+            let angle = coordinator.videoRotationAngleForHorizonLevelCapture
+            let rightAngle = ((angle / 90).rounded() * 90).truncatingRemainder(dividingBy: 360)
+            let rotation = rightAngle < 0 ? rightAngle + 360 : rightAngle
+            if connection.isVideoRotationAngleSupported(rotation) {
+                connection.videoRotationAngle = rotation
+                log.info("Recording rotation: \(rotation) degrees for \(position.rawValue)", category: "SessionWorker")
+            } else {
+                log.warning("Recording rotation is unsupported: \(rotation) degrees", category: "SessionWorker")
+            }
+        }
+        let outputs: [AVCaptureOutput?] = [storedPhotoOutput, storedRecordingVideoOutput]
         for output in outputs.compactMap({ $0 }) {
             guard let connection = output.connection(with: .video),
                   connection.isVideoMirroringSupported else { continue }
@@ -556,14 +599,22 @@ private final class CameraSessionWorker: @unchecked Sendable {
         storedPhotoOutput = output
     }
 
-    private func setupMovieOutput() throws {
-        guard storedMovieFileOutput == nil else { return }
-        let output = AVCaptureMovieFileOutput()
+    private func setupRecordingVideoOutput(_ output: AVCaptureVideoDataOutput) throws {
+        guard storedRecordingVideoOutput == nil else { return }
         guard captureSession.canAddOutput(output) else {
             throw CameraError.setupFailed
         }
         captureSession.addOutput(output)
-        storedMovieFileOutput = output
+        storedRecordingVideoOutput = output
+    }
+
+    private func setupRecordingAudioOutput(_ output: AVCaptureAudioDataOutput) throws {
+        guard storedRecordingAudioOutput == nil else { return }
+        guard captureSession.canAddOutput(output) else {
+            throw CameraError.setupFailed
+        }
+        captureSession.addOutput(output)
+        storedRecordingAudioOutput = output
     }
 
     private func setupAudioInput() throws {
@@ -581,11 +632,13 @@ private final class CameraSessionWorker: @unchecked Sendable {
 
     private func removePartialConfiguration() {
         if let output = storedPhotoOutput { captureSession.removeOutput(output) }
-        if let output = storedMovieFileOutput { captureSession.removeOutput(output) }
+        if let output = storedRecordingVideoOutput { captureSession.removeOutput(output) }
+        if let output = storedRecordingAudioOutput { captureSession.removeOutput(output) }
         if let input = storedAudioDeviceInput { captureSession.removeInput(input) }
         if let input = storedVideoDeviceInput { captureSession.removeInput(input) }
         storedPhotoOutput = nil
-        storedMovieFileOutput = nil
+        storedRecordingVideoOutput = nil
+        storedRecordingAudioOutput = nil
         storedAudioDeviceInput = nil
         storedVideoDeviceInput = nil
         storedCurrentDevice = nil

@@ -283,6 +283,7 @@ private extension AGCameraView {
                 present(error)
             }
         }
+        .disabled(manager.isPreparingVideoRecording)
     }
     
     private var switchCameraButton: some View {
@@ -293,7 +294,7 @@ private extension AGCameraView {
                 present(error)
             }
         }
-        .disabled(!manager.isSessionRunning)
+        .disabled(!manager.isSessionRunning || manager.isPreparingVideoRecording)
         .opacity(manager.isSessionRunning ? 1 : 0)
     }
 }

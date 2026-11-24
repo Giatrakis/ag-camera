@@ -1,12 +1,14 @@
 import AVFoundation
+import AVKit
+import CoreTransferable
 import SwiftUI
+import UniformTypeIdentifiers
 import ag_camera
 
 struct ContentView: View {
     @State private var cameraManager: AGCameraManager
     @State private var cameraIdentity = UUID()
-    @State private var capturedPhoto: CapturedPhoto?
-    @State private var showSettings = false
+    @State private var presentedSheet: PresentedSheet?
     @State private var showControlError = false
     @State private var controlErrorMessage = ""
 
@@ -18,8 +20,8 @@ struct ContentView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             AGCameraView(manager: cameraManager)
-                .onPhotoCapture { capturedPhoto = CapturedPhoto(image: $0) }
-                .onVideoStopped { print("VIDEO URL: \($0)") }
+                .onPhotoCapture { presentedSheet = .photo(CapturedPhoto(image: $0)) }
+                .onVideoStopped { presentedSheet = .video(CapturedVideo(url: $0)) }
                 .id(cameraIdentity)
 
             if !cameraManager.configuration.showDefaultControls {
@@ -38,7 +40,7 @@ struct ContentView: View {
                 .accessibilityLabel("Toggle torch")
 
                 Button {
-                    showSettings = true
+                    presentedSheet = .settings
                 } label: {
                     Image(systemName: "gearshape.fill")
                         .font(.title2)
@@ -51,11 +53,15 @@ struct ContentView: View {
             .background(.black.opacity(0.55), in: Capsule())
             .padding()
         }
-        .sheet(isPresented: $showSettings) {
-            CameraSettingsView(configuration: cameraManager.configuration, onApply: applySettings)
-        }
-        .sheet(item: $capturedPhoto) { photo in
-            CapturePhotoPreview(photo: photo.image)
+        .sheet(item: $presentedSheet) { sheet in
+            switch sheet {
+            case .settings:
+                CameraSettingsView(configuration: cameraManager.configuration, onApply: applySettings)
+            case .photo(let photo):
+                CapturePhotoPreview(photo: photo.image)
+            case .video(let video):
+                CaptureVideoPreview(url: video.url)
+            }
         }
         .alert("Camera Control", isPresented: $showControlError) {
             Button("OK", role: .cancel) { }
@@ -91,7 +97,7 @@ struct ContentView: View {
                 } label: {
                     Label("Rotate", systemImage: "camera.rotate")
                 }
-                .disabled(!cameraManager.isSessionRunning)
+                .disabled(!cameraManager.isSessionRunning || cameraManager.isPreparingVideoRecording)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white)
@@ -102,9 +108,31 @@ struct ContentView: View {
     }
 }
 
+private enum PresentedSheet: Identifiable {
+    case settings
+    case photo(CapturedPhoto)
+    case video(CapturedVideo)
+
+    var id: String {
+        switch self {
+        case .settings:
+            "settings"
+        case .photo(let photo):
+            photo.id.uuidString
+        case .video(let video):
+            video.id.uuidString
+        }
+    }
+}
+
 private struct CapturedPhoto: Identifiable {
     let id = UUID()
     let image: UIImage
+}
+
+private struct CapturedVideo: Identifiable {
+    let id = UUID()
+    let url: URL
 }
 
 private struct CapturePhotoPreview: View {
@@ -129,9 +157,56 @@ private struct CapturePhotoPreview: View {
     }
 }
 
+private struct CaptureVideoPreview: View {
+    let url: URL
+
+    @State private var player: AVPlayer
+
+    @Environment(\.dismiss) private var dismiss
+
+    init(url: URL) {
+        self.url = url
+        self._player = State(initialValue: AVPlayer(url: url))
+    }
+
+    var body: some View {
+        NavigationStack {
+            VideoPlayer(player: player)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.black)
+                .navigationTitle("Video Preview")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        ShareLink(item: SharedRecording(url: url), preview: SharePreview("Recorded Video")) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .accessibilityLabel("Share recording")
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+        }
+        .presentationDetents([.large])
+        .onAppear { player.play() }
+        .onDisappear { player.pause() }
+    }
+}
+
+private struct SharedRecording: Transferable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .quickTimeMovie) { recording in
+            SentTransferredFile(recording.url)
+        }
+    }
+}
+
 private extension ContentView {
     func applySettings(_ configuration: AGCameraConfiguration) {
-        capturedPhoto = nil
+        presentedSheet = nil
         cameraManager = AGCameraManager(configuration: configuration)
         cameraIdentity = UUID()
     }
