@@ -597,8 +597,8 @@ private final class CameraSessionWorker: @unchecked Sendable {
             return AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
         }
         let types: [AVCaptureDevice.DeviceType] = [
-            .builtInDualWideCamera,
             .builtInTripleCamera,
+            .builtInDualWideCamera,
             .builtInDualCamera,
             .builtInWideAngleCamera
         ]

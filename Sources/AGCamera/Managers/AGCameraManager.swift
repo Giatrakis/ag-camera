@@ -23,6 +23,7 @@ public class AGCameraManager: NSObject {
     public private(set) var lastZoomFactor: CGFloat = 1.0
     public private(set) var minZoomFactor: CGFloat = 1.0
     public private(set) var maxZoomFactor: CGFloat = 1.0
+    public private(set) var availableZoomLevels: [CGFloat] = [1.0]
     public private(set) var isTorchOn = false
     public private(set) var isSwitchingCamera = false
     public var outputType: AGOutputType = .photo
@@ -134,6 +135,17 @@ public class AGCameraManager: NSObject {
     private func updateObservedSessionState() {
         isSessionRunning = observedIsRunning && !observedIsInterrupted && isViewActive
     }
+
+    private func refreshZoomState() {
+        currentZoomFactor = zoomManager.getCurrentZoomFactor()
+        lastZoomFactor = currentZoomFactor
+        minZoomFactor = zoomManager.getMinZoomFactor()
+        maxZoomFactor = zoomManager.getMaxZoomFactor(
+            for: currentCameraPosition,
+            configuredMaximum: configuredZoomMaximum
+        )
+        availableZoomLevels = zoomManager.getAvailableZoomLevels(maximumZoomFactor: configuredZoomMaximum)
+    }
 }
 
 // MARK: - Session Management
@@ -179,18 +191,11 @@ extension AGCameraManager {
                 exposureMode: configuration.defaultExposureMode
             )
 
-            let appliedZoom = (try? await zoomManager.setZoom(
+            _ = try? await zoomManager.setZoom(
                 factor: configuration.defaultZoomScale,
                 maximumZoomFactor: configuredZoomMaximum
-            ))
-                ?? zoomManager.getCurrentZoomFactor()
-            currentZoomFactor = appliedZoom
-            lastZoomFactor = appliedZoom
-            minZoomFactor = zoomManager.getMinZoomFactor()
-            maxZoomFactor = zoomManager.getMaxZoomFactor(
-                for: currentCameraPosition,
-                configuredMaximum: configuredZoomMaximum
             )
+            refreshZoomState()
 
             isSessionConfigured = true
             self.error = nil
@@ -230,6 +235,7 @@ extension AGCameraManager {
 
     public func addVideoDataOutput(_ output: AVCaptureVideoDataOutput) async throws {
         try await sessionManager.addVideoDataOutput(output)
+        refreshZoomState()
     }
 
     public func handleAppBackground() {
@@ -325,11 +331,11 @@ extension AGCameraManager {
             throw error
         }
 
-        let appliedZoom = (try? await zoomManager.setZoom(
+        _ = try? await zoomManager.setZoom(
             factor: savedZoom,
             maximumZoomFactor: configuredZoomMaximum
-        )) ?? currentZoomFactor
-        currentZoomFactor = appliedZoom
+        )
+        refreshZoomState()
         captureManager.videoCodec = configuration.videoCodec
 
         let url: URL
@@ -402,12 +408,9 @@ extension AGCameraManager {
 
             currentCameraPosition = newPosition
             isTorchOn = false
-            currentZoomFactor = zoomState.factor
-            lastZoomFactor = zoomState.factor
-            minZoomFactor = zoomState.minimum
-            maxZoomFactor = zoomState.maximum
+            refreshZoomState()
             onCameraPositionChanged?(newPosition)
-            onZoomChanged?(zoomState.factor)
+            onZoomChanged?(currentZoomFactor)
             if !zoomState.didApplyDeviceSettings {
                 reportError(CameraError.invalidConfiguration, fallback: .invalidConfiguration)
             }
@@ -526,15 +529,15 @@ extension AGCameraManager {
 extension AGCameraManager {
 
     public func setZoom(factor: CGFloat) async throws {
+        guard !Task.isCancelled else { return }
         zoomCommandID += 1
         let commandID = zoomCommandID
-        let applied = try await zoomManager.setZoom(
+        try await zoomManager.setZoom(
             factor: factor,
             maximumZoomFactor: configuredZoomMaximum
         )
-        guard commandID == zoomCommandID else { return }
-        currentZoomFactor = applied
-        lastZoomFactor = currentZoomFactor
+        guard !Task.isCancelled, commandID == zoomCommandID else { return }
+        refreshZoomState()
         onZoomChanged?(currentZoomFactor)
     }
 
@@ -543,8 +546,8 @@ extension AGCameraManager {
         zoomCommandID += 1
         let commandID = zoomCommandID
         let newZoom = lastZoomFactor * scale
-        let maxZoom = maxZoomFactor
-        let minZoom = minZoomFactor
+        let maxZoom = zoomManager.getMaxZoomFactor(for: currentCameraPosition, configuredMaximum: configuredZoomMaximum)
+        let minZoom = zoomManager.getMinZoomFactor()
         let clampedZoom = min(max(newZoom, minZoom), maxZoom)
 
         let applied = try await zoomManager.setZoom(
@@ -556,36 +559,8 @@ extension AGCameraManager {
         onZoomChanged?(currentZoomFactor)
 
         if isGestureEnded {
-            lastZoomFactor = currentZoomFactor
+            refreshZoomState()
         }
-    }
-
-    public var availableZoomLevels: [CGFloat] {
-        let minZoom = minZoomFactor
-        let maxZoom = maxZoomFactor
-        var levels: [CGFloat] = []
-
-        if minZoom <= 0.5 && maxZoom >= 0.5 && currentCameraPosition == .back {
-            levels.append(0.5)
-        }
-
-        if minZoom <= 1.0 && maxZoom >= 1.0 {
-            levels.append(1.0)
-        }
-
-        if maxZoom >= 2.0 {
-            levels.append(2.0)
-        }
-
-        if maxZoom >= 3.0 {
-            levels.append(3.0)
-        }
-
-        if maxZoom >= 5.0 {
-            levels.append(5.0)
-        }
-
-        return levels.isEmpty ? [minZoom] : levels
     }
 }
 
@@ -596,6 +571,7 @@ extension AGCameraManager {
     public func setSessionPreset(_ preset: AVCaptureSession.Preset) async throws {
         try await qualitySettings.setSessionPreset(preset)
         configuration.sessionPreset = preset
+        refreshZoomState()
     }
 
     public func setPhotoQualityPrioritization(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) {
@@ -629,6 +605,7 @@ extension AGCameraManager {
     public func setFrameRate(fps: Int32) async throws {
         try await qualitySettings.setFrameRate(fps: fps)
         configuration.videoFrameRate = fps
+        refreshZoomState()
     }
 }
 

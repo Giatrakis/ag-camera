@@ -163,6 +163,8 @@ Movie output and microphone input are prepared when recording first starts, so t
 
 Zoom, focus, exposure, torch, frame rate, and session preset setters are `async throws` so camera-device configuration runs off the main actor. Call them with `try await` from custom controls. Video stabilization is also asynchronous (`await camera.setVideoStabilizationMode(_:)`). Flash mode, photo quality, codec, and logging setters remain synchronous.
 
+`minZoomFactor`, `maxZoomFactor`, and `currentZoomFactor` use the camera's display zoom scale. `availableZoomLevels` provides button stops derived from the active device's minimum zoom, virtual-camera lens switch points, and native-resolution zoom factors, limited by the configured maximum. The built-in zoom control fills its available width, centers the selected stop, and applies a new stop when scrolling settles. Tapping the selected 1× stop cycles through 1.2×, 1.5×, and 1× when supported, briefly showing 28 MM, 35 MM, and 24 MM respectively with a fade transition. These focal-length labels are fixed UI presets; they are not read from the camera hardware. Pinch zoom and `setZoom(factor:)` also accept values between stops; requested values outside the supported range are clamped. Available stops can change when the camera, session preset, or frame rate changes.
+
 `outputType` and `setOutputType(_:)` select the built-in photo or video button. Both capture methods remain available to custom controls regardless of that selection.
 
 ```swift

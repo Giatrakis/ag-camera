@@ -150,8 +150,9 @@ struct AGCameraPreview: UIViewRepresentable {
         }
 
         @objc private func handleTap(_ recognizer: UITapGestureRecognizer) {
-            guard let onTapToFocus else { return }
+            guard isSessionRunning, let onTapToFocus, let visibleVideoRect else { return }
             let location = recognizer.location(in: self)
+            guard visibleVideoRect.contains(location) else { return }
             let devicePoint = previewLayer.captureDevicePointConverted(fromLayerPoint: location)
             onTapToFocus(location, devicePoint)
         }
@@ -162,14 +163,18 @@ struct AGCameraPreview: UIViewRepresentable {
         }
 
         func reportVideoRectIfChanged() {
-            guard bounds.width > 0, bounds.height > 0 else { return }
+            guard let visibleRect = visibleVideoRect, visibleRect != reportedVideoRect else { return }
+            reportedVideoRect = visibleRect
+            onVideoRectChanged?(visibleRect)
+        }
+
+        private var visibleVideoRect: CGRect? {
+            guard bounds.width > 0, bounds.height > 0 else { return nil }
             let imageRect = previewLayer.layerRectConverted(
                 fromMetadataOutputRect: CGRect(x: 0, y: 0, width: 1, height: 1)
             )
             let visibleRect = imageRect.intersection(bounds)
-            guard !visibleRect.isNull, !visibleRect.isEmpty, visibleRect != reportedVideoRect else { return }
-            reportedVideoRect = visibleRect
-            onVideoRectChanged?(visibleRect)
+            return !visibleRect.isNull && !visibleRect.isEmpty ? visibleRect : nil
         }
     }
 }

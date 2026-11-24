@@ -169,15 +169,21 @@ public struct AGCameraView: View {
                 .frame(width: visibleVideoRect.width, height: visibleVideoRect.height)
                 .offset(x: visibleVideoRect.minX, y: visibleVideoRect.minY)
         }
-        .overlay { focusIndicatorOverlay }
+        .overlay(alignment: .topLeading) { focusIndicatorOverlay }
         .ignoresSafeArea()
     }
 
     @ViewBuilder
     private var focusIndicatorOverlay: some View {
-        if showFocusIndicator, let point = focusPoint {
+        if showFocusIndicator, let point = focusPoint, !visibleVideoRect.isEmpty {
             displayedConfiguration.focusIndicator
-                .position(point)
+                .position(
+                    x: point.x - visibleVideoRect.minX,
+                    y: point.y - visibleVideoRect.minY
+                )
+                .frame(width: visibleVideoRect.width, height: visibleVideoRect.height)
+                .clipped()
+                .offset(x: visibleVideoRect.minX, y: visibleVideoRect.minY)
                 .allowsHitTesting(false)
         }
     }
@@ -235,14 +241,15 @@ private extension AGCameraView {
                 AGInputPickerButton(outputType: $manager.outputType)
                 switchCameraButton
             }
+            .padding(.horizontal)
         }
-        .padding(.horizontal)
         .padding(.bottom, 30)
     }
     
     private var zoomButton: some View {
         AGSZoomControlView(manager: manager) { newZoomLevel in
-            Task {
+            zoomTask?.cancel()
+            zoomTask = Task {
                 do {
                     try await manager.setZoom(factor: newZoomLevel)
                 } catch {
