@@ -46,6 +46,7 @@ struct CameraSettingsView: View {
                 Text("Rule of Thirds").tag(AGCameraGrid.rule3x3)
                 Text("4 × 4").tag(AGCameraGrid.square4x4)
             }
+            .pickerStyle(.inline)
             Picker("Tap to focus", selection: $draft.tapToFocusBehavior) {
                 Text("Off").tag(AGTapToFocusBehavior.none)
                 Text("Focus only").tag(AGTapToFocusBehavior.focusOnly)

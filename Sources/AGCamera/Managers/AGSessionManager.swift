@@ -7,6 +7,12 @@ struct AGZoomState: Sendable {
     let didApplyDeviceSettings: Bool
 }
 
+// The caller configures the output before registration; only this queue changes its session membership.
+// Remove this wrapper when AVFoundation output types become Sendable.
+private struct QueuedVideoDataOutput: @unchecked Sendable {
+    let value: AVCaptureVideoDataOutput
+}
+
 @MainActor
 final class AGSessionManager {
     private let worker: CameraSessionWorker
@@ -70,6 +76,10 @@ final class AGSessionManager {
 
     func setSessionPreset(_ preset: AVCaptureSession.Preset) async throws {
         try await worker.setSessionPreset(preset)
+    }
+
+    func addVideoDataOutput(_ output: AVCaptureVideoDataOutput) async throws {
+        try await worker.addVideoDataOutput(output)
     }
 
     func setFrameRate(fps: Int32) async throws {
@@ -317,6 +327,33 @@ private final class CameraSessionWorker: @unchecked Sendable {
                 }
                 self.captureSession.beginConfiguration()
                 self.captureSession.sessionPreset = preset
+                self.captureSession.commitConfiguration()
+                continuation.resume()
+            }
+        }
+    }
+
+    func addVideoDataOutput(_ output: AVCaptureVideoDataOutput) async throws {
+        let queuedOutput = QueuedVideoDataOutput(value: output)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                let output = queuedOutput.value
+                guard self.storedIsConfigured else {
+                    continuation.resume(throwing: CameraError.setupFailed)
+                    return
+                }
+                guard !self.captureSession.outputs.contains(where: { $0 === output }) else {
+                    continuation.resume()
+                    return
+                }
+
+                self.captureSession.beginConfiguration()
+                guard self.captureSession.canAddOutput(output) else {
+                    self.captureSession.commitConfiguration()
+                    continuation.resume(throwing: CameraError.setupFailed)
+                    return
+                }
+                self.captureSession.addOutput(output)
                 self.captureSession.commitConfiguration()
                 continuation.resume()
             }

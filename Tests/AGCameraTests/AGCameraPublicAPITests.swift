@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import Testing
 #if canImport(AGCamera)
@@ -26,5 +27,14 @@ struct AGCameraPublicAPITests {
         #expect(type(of: zoom) == AGSZoomControlView.self)
         #expect(type(of: duration) == AGVideoDurationView.self)
         #expect(type(of: indicator) == AGFocusIndicatorView.self)
+    }
+
+    @Test
+    func videoDataOutputRequiresConfiguredSession() async {
+        let manager = AGCameraManager()
+
+        await #expect(throws: CameraError.setupFailed) {
+            try await manager.addVideoDataOutput(AVCaptureVideoDataOutput())
+        }
     }
 }

@@ -228,6 +228,10 @@ extension AGCameraManager {
         }
     }
 
+    public func addVideoDataOutput(_ output: AVCaptureVideoDataOutput) async throws {
+        try await sessionManager.addVideoDataOutput(output)
+    }
+
     public func handleAppBackground() {
         isViewActive = false
         updateObservedSessionState()

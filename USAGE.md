@@ -135,6 +135,10 @@ struct CustomCameraScreen: View {
 
 `AGCameraPreview` is an implementation detail and is not part of the public package API. Use `AGCameraView` when building a custom camera screen.
 
+## Custom video processing
+
+Configure an `AVCaptureVideoDataOutput` and its sample buffer delegate before calling `camera.addVideoDataOutput(output)`. Wait until `camera.isSessionConfigured` is true, then await the throwing method. The SDK attaches the output on its session queue; it reports `CameraError.setupFailed` if the session is not configured or cannot accept the output. Keep the output and delegate alive while processing frames.
+
 ## Capture results and saving
 
 `capturePhoto()` returns encoded image `Data`. `startVideoRecording()` returns the temporary movie URL after recording starts. `stopVideoRecording()` returns the completed movie URL. Both video methods are asynchronous and throwing.

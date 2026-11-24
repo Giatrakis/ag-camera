@@ -18,6 +18,7 @@ public struct AGCameraView: View {
     @State private var showFocusIndicator = false
     @State private var focusTask: Task<Void, Never>?
     @State private var zoomTask: Task<Void, Never>?
+    @State private var visibleVideoRect = CGRect.zero
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -133,9 +134,15 @@ public struct AGCameraView: View {
             mirrorFrontCamera: displayedConfiguration.mirrorFrontCamera,
             log: manager.log,
             loggingEnabled: displayedConfiguration.enableLogging,
-            onTapToFocus: tapToFocusHandler
+            onTapToFocus: tapToFocusHandler,
+            onVideoRectChanged: { rect in
+                Task { @MainActor in
+                    if visibleVideoRect != rect {
+                        visibleVideoRect = rect
+                    }
+                }
+            }
         )
-        .ignoresSafeArea()
         .gesture(
             MagnifyGesture()
                 .onChanged { value in
@@ -157,8 +164,13 @@ public struct AGCameraView: View {
                 .opacity(manager.isSwitchingCamera ? 1 : 0)
                 .allowsHitTesting(false)
         }
-        .overlay { AGCameraGridOverlay(grid: displayedConfiguration.grid) }
+        .overlay(alignment: .topLeading) {
+            AGCameraGridOverlay(grid: displayedConfiguration.grid)
+                .frame(width: visibleVideoRect.width, height: visibleVideoRect.height)
+                .offset(x: visibleVideoRect.minX, y: visibleVideoRect.minY)
+        }
         .overlay { focusIndicatorOverlay }
+        .ignoresSafeArea()
     }
 
     @ViewBuilder
@@ -282,6 +294,7 @@ private extension AGCameraView {
 // MARK: Useful Methods
 private extension AGCameraView {
     private func setupCamera() async {
+        guard !manager.isSessionConfigured else { return }
         do {
             try await manager.setupSession()
             guard !Task.isCancelled else { return }

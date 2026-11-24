@@ -20,6 +20,7 @@ struct AGCameraPreview: UIViewRepresentable {
     let log: AGCameraLog
     let loggingEnabled: Bool
     let onTapToFocus: ((CGPoint, CGPoint) -> Void)?
+    let onVideoRectChanged: (CGRect) -> Void
 
     init(
         session: AVCaptureSession,
@@ -30,7 +31,8 @@ struct AGCameraPreview: UIViewRepresentable {
         mirrorFrontCamera: Bool,
         log: AGCameraLog,
         loggingEnabled: Bool,
-        onTapToFocus: ((CGPoint, CGPoint) -> Void)?
+        onTapToFocus: ((CGPoint, CGPoint) -> Void)?,
+        onVideoRectChanged: @escaping (CGRect) -> Void
     ) {
         self.session = session
         self.isSessionConfigured = isSessionConfigured
@@ -41,6 +43,7 @@ struct AGCameraPreview: UIViewRepresentable {
         self.log = log
         self.loggingEnabled = loggingEnabled
         self.onTapToFocus = onTapToFocus
+        self.onVideoRectChanged = onVideoRectChanged
     }
 
     func makeUIView(context: Context) -> PreviewView {
@@ -54,7 +57,9 @@ struct AGCameraPreview: UIViewRepresentable {
         view.log = log
         view.loggingEnabled = loggingEnabled
         view.onTapToFocus = onTapToFocus
+        view.onVideoRectChanged = onVideoRectChanged
         updateMirroring(for: view)
+        view.reportVideoRectIfChanged()
         return view
     }
 
@@ -79,9 +84,11 @@ struct AGCameraPreview: UIViewRepresentable {
         uiView.log = log
         uiView.loggingEnabled = loggingEnabled
         uiView.onTapToFocus = onTapToFocus
+        uiView.onVideoRectChanged = onVideoRectChanged
         if shouldUpdateMirroring {
             updateMirroring(for: uiView)
         }
+        uiView.reportVideoRectIfChanged()
     }
 
     private func updateMirroring(for view: PreviewView) {
@@ -108,6 +115,8 @@ struct AGCameraPreview: UIViewRepresentable {
         var log: AGCameraLog?
         var loggingEnabled = true
         var onTapToFocus: ((CGPoint, CGPoint) -> Void)?
+        var onVideoRectChanged: ((CGRect) -> Void)?
+        private var reportedVideoRect = CGRect.null
 
         var previewLayer: AVCaptureVideoPreviewLayer {
             guard let previewLayer = layer as? AVCaptureVideoPreviewLayer else {
@@ -149,8 +158,18 @@ struct AGCameraPreview: UIViewRepresentable {
 
         override func layoutSubviews() {
             super.layoutSubviews()
-            previewLayer.frame = bounds
+            reportVideoRectIfChanged()
         }
 
+        func reportVideoRectIfChanged() {
+            guard bounds.width > 0, bounds.height > 0 else { return }
+            let imageRect = previewLayer.layerRectConverted(
+                fromMetadataOutputRect: CGRect(x: 0, y: 0, width: 1, height: 1)
+            )
+            let visibleRect = imageRect.intersection(bounds)
+            guard !visibleRect.isNull, !visibleRect.isEmpty, visibleRect != reportedVideoRect else { return }
+            reportedVideoRect = visibleRect
+            onVideoRectChanged?(visibleRect)
+        }
     }
 }
