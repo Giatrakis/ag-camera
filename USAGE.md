@@ -31,7 +31,7 @@ struct CameraScreen: View {
 
 `AGCameraView` requests camera permission by default, configures the capture session, starts it while the view is visible, and stops it when the view disappears. It does not automatically save captures to Photos. The URL returned for a video is in the temporary directory; move it or save it before relying on long-term retention.
 
-`camera.capabilities` is `nil` until a session is configured. Its snapshot describes the active camera's flash, torch, Live Photo, focus, exposure, manual-control support, photo codecs and file types, and session presets. It refreshes after camera switches and relevant session changes. It reports hardware and current session support; permission-dependent Live Photo availability remains `camera.isLivePhotoAvailable`.
+`camera.capabilities` is `nil` until a session is configured. Its snapshot describes the active camera's flash, torch, Live Photo, focus, exposure, manual-control support, photo formats, codecs and file types, and session presets. It refreshes after camera switches and relevant session changes. `supportedPhotoFormats` contains the JPEG and HEIF options available for the active camera and session. It reports hardware and current session support; permission-dependent Live Photo availability remains `camera.isLivePhotoAvailable`.
 
 `camera.photoCaptureReadiness` exposes AVFoundation's current readiness state. `camera.isPhotoCaptureReady` also checks session visibility, camera switching, and Live Photo availability when mode is On. Use it to disable a custom shutter; the built-in shutter already uses it. Readiness can briefly change during capture and processing.
 
@@ -42,7 +42,7 @@ Button("Capture") {
 .disabled(!camera.isPhotoCaptureReady)
 ```
 
-The demo app has a settings button above the preview. It exposes grid, tap behavior, mirroring, zoom, focus and exposure defaults, photo quality, Live Photo mode, session preset, video frame rate and codec, torch power, and logging. Tap **Apply** to create a new camera manager and session with those initial settings. The torch button beside Settings tests the chosen power level.
+The demo app has a settings button above the preview. It exposes grid, tap behavior, mirroring, zoom, focus and exposure defaults, photo quality and format, Live Photo mode, session preset, video frame rate and codec, torch power, and logging. Tap **Apply** to create a new camera manager and session with those initial settings. The torch button beside Settings tests the chosen power level.
 
 Initial options can be supplied when creating the manager:
 
@@ -59,6 +59,7 @@ let configuration = AGCameraConfiguration(
     defaultFocusMode: .continuousAutoFocus,
     defaultExposureMode: .continuousAutoExposure,
     photoQualityPrioritization: .balanced,
+    photoFormat: .heif,
     livePhotoMode: .auto,
     sessionPreset: .hd1920x1080,
     videoFrameRate: 30,
@@ -70,7 +71,7 @@ let camera = AGCameraManager(configuration: configuration)
 
 The view also exposes fluent modifiers for these settings, plus `.tapToFocusBehavior(.focusOnly)`, `.grid(.rule3x3)`, and `.livePhotoMode(.auto)`. Tap behavior is `.none`, `.focusOnly`, or `.focusAndExposure`; `.enableTapToFocus(false)` disables taps. With `.focusAndExposure`, tapping the preview shows a sun beside the focus indicator. Drag up or down on the preview while it is visible to brighten or darken the image. Tapping a new point resets the adjustment to neutral 0 EV. The adjustment is exposure target bias, clamped to the selected camera's supported EV range. Grid options are `.none`, `.rule3x3`, and `.square4x4`. Configuration modifiers are initial-only overrides applied before the first session setup; they are not a way to reconfigure an active session. `.exposureBias(_:)` is a live binding modifier for custom controls. Unmodified options continue to use the manager's latest configuration at setup time. Use manager methods for other live changes. To manage camera permission yourself, use `.handlePermissions(false)` and authorize through `camera.permissionManager` first.
 
-Photo quality accepts `.speed`, `.balanced`, or `.quality`. The session preset accepts any `AVCaptureSession.Preset` supported by the current camera, including `.photo`, `.high`, `.hd1920x1080`, and `.hd4K3840x2160`. Frame rate is an integer such as 24, 30, or 60 fps; the selected camera format must support it. For video codec, use `.h264`, `.hevc`, or `nil` to leave the system default. Recordings use a `.mov` container regardless of codec. Unsupported preset, frame rate, or codec selections report `CameraError.invalidConfiguration` when applied.
+Photo quality accepts `.speed`, `.balanced`, or `.quality`. Photo format accepts `.automatic` (the default), `.jpeg`, or `.heif`. The active camera and session must support the selected file type and codec; check `camera.capabilities?.supportedPhotoFormats`. An unsupported photo format reports `CameraError.unsupportedPhotoFormat` at setup, on a live `setPhotoFormat(_:)` call, or at capture after a camera switch. The selected format also applies to the still resource of Live Photos. Use `.photoFormat(.heif)` on `AGCameraView` for an initial selection, or `try camera.setPhotoFormat(.heif)` to change it while running. The session preset accepts any `AVCaptureSession.Preset` supported by the current camera, including `.photo`, `.high`, `.hd1920x1080`, and `.hd4K3840x2160`. Frame rate is an integer such as 24, 30, or 60 fps; the selected camera format must support it. For video codec, use `.h264`, `.hevc`, or `nil` to leave the system default. Recordings use a `.mov` container regardless of codec. Unsupported preset, frame rate, or codec selections report `CameraError.invalidConfiguration` when applied.
 
 The front camera is mirrored by default in the preview and captured media. Set `mirrorFrontCamera: false` to turn that off. Zoom caps are in the displayed zoom scale and are also limited by hardware support. Torch level is from `0` (off) to `1` (full power); the torch must be available on the selected camera. Logging is enabled by default and can be disabled per camera manager.
 
@@ -177,7 +178,7 @@ Configure an `AVCaptureVideoDataOutput` and its sample buffer delegate before ca
 
 ## Capture results and saving
 
-`capturePhoto()` always returns still-image `Data`. `captureSelectedPhoto()` uses the current Live Photo mode and returns `.still(Data)` or `.live(AGLivePhotoCapture)`. `captureLivePhoto()` explicitly returns a still image and paired movie when the mode is On or Auto and Live capture is available. `startVideoRecording()` returns the temporary movie URL after recording starts. `stopVideoRecording()` returns the completed movie URL. These capture methods are asynchronous and throwing.
+`capturePhoto()` always returns encoded still-image `Data` in the selected photo format. `AGPhotoFormat.fileExtension(for:)` reads the actual encoded type from those bytes, including when the format is automatic. `captureSelectedPhoto()` uses the current Live Photo mode and returns `.still(Data)` or `.live(AGLivePhotoCapture)`. `captureLivePhoto()` explicitly returns a still image and paired movie when the mode is On or Auto and Live capture is available. `AGLivePhotoCapture.photoFileExtension` identifies the still resource type for file-based previews. `startVideoRecording()` returns the temporary movie URL after recording starts. `stopVideoRecording()` returns the completed movie URL. These capture methods are asynchronous and throwing.
 
 ```swift
 let photoData = try await camera.capturePhoto()
@@ -219,4 +220,4 @@ try await camera.setSessionPreset(.hd1920x1080)
 
 ## Current scope
 
-The SDK currently supports still photos, Live Photos, video recording, a SwiftUI preview with built-in controls, and direct camera settings. It does not provide a media browser, capture format picker, editing pipeline, or automatic persistence. `AGCameraView` displays camera errors in an alert; the host app owns saved media.
+The SDK currently supports still photos with JPEG/HEIF selection, Live Photos, video recording, a SwiftUI preview with built-in controls, and direct camera settings. It does not provide a media browser, editing pipeline, or automatic persistence. `AGCameraView` displays camera errors in an alert; the host app owns saved media.

@@ -12,5 +12,6 @@ public struct AGCameraCapabilities: Equatable {
     public let supportsWhiteBalanceLock: Bool
     public let supportedPhotoCodecs: [AVVideoCodecType]
     public let supportedPhotoFileTypes: [AVFileType]
+    public let supportedPhotoFormats: [AGPhotoFormat]
     public let supportedSessionPresets: [AVCaptureSession.Preset]
 }

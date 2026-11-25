@@ -39,10 +39,10 @@ struct CameraScreen: View {
 
 `AGCameraView` requests camera access when permission handling is enabled. Video recordings and Live Photos request microphone access and require the host app's `NSMicrophoneUsageDescription`. The explicit save methods request photo library add access when needed. The camera requires a physical device for capture validation.
 
-After setup, `camera.capabilities` describes the active camera's supported controls, photo codecs and file types, and session presets. `camera.isPhotoCaptureReady` reports whether the shutter can respond now; the built-in photo button follows that state.
+After setup, `camera.capabilities` describes the active camera's supported controls, photo formats, codecs, file types, and session presets. `camera.isPhotoCaptureReady` reports whether the shutter can respond now; the built-in photo button follows that state.
 
 See [USAGE.md](USAGE.md) for configuration, custom controls, and the manager API.
 
 ## Current scope
 
-The package supports one active capture session with still photos, Live Photos, and video recordings that can switch between front and back cameras. Video and microphone samples are written to one movie file; the video may briefly hold a frame while the camera input changes. It does not yet provide a full camera product surface such as an in-app media browser, capture format selection, or a processing pipeline. The host app owns its permission descriptions and captured media handling. `AGCameraView` presents camera errors in an alert.
+The package supports one active capture session with still photos, Live Photos, JPEG/HEIF photo selection, and video recordings that can switch between front and back cameras. Video and microphone samples are written to one movie file; the video may briefly hold a frame while the camera input changes. It does not yet provide a full camera product surface such as an in-app media browser or a processing pipeline. The host app owns its permission descriptions and captured media handling. `AGCameraView` presents camera errors in an alert.

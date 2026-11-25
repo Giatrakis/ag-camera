@@ -1,5 +1,8 @@
 import AVFoundation
+import ImageIO
 import Testing
+import UIKit
+import UniformTypeIdentifiers
 #if canImport(AGCamera)
 @testable import AGCamera
 #else
@@ -29,6 +32,7 @@ struct AGCameraViewConfigurationTests {
             .maxFrontZoomFactor(2.5)
             .maxBackZoomFactor(8)
             .photoQuality(.speed)
+            .photoFormat(.heif)
             .sessionPreset(.hd1920x1080)
             .videoFrameRate(24)
             .videoCodec(.hevc)
@@ -47,6 +51,7 @@ struct AGCameraViewConfigurationTests {
         #expect(view.configuration.maxFrontZoomFactor == 2.5)
         #expect(view.configuration.maxBackZoomFactor == 8)
         #expect(view.configuration.photoQualityPrioritization == .speed)
+        #expect(view.configuration.photoFormat == .heif)
         #expect(view.configuration.sessionPreset == .hd1920x1080)
         #expect(view.configuration.videoFrameRate == 24)
         #expect(view.configuration.videoCodec == .hevc)
@@ -62,7 +67,37 @@ struct AGCameraViewConfigurationTests {
         #expect(manager.configuration.showDefaultControls == true)
         #expect(manager.configuration.defaultCameraPosition == .back)
         #expect(manager.configuration.videoCodec == nil)
+        #expect(manager.configuration.photoFormat == .automatic)
         #expect(manager.configuration.enableLogging)
+    }
+
+    @Test
+    func photoFormatSelectionUpdatesCaptureConfiguration() throws {
+        #expect(AGPhotoFormat.automatic.fileType == nil)
+        #expect(AGPhotoFormat.automatic.codec == nil)
+        #expect(AGPhotoFormat.jpeg.fileType == .jpg)
+        #expect(AGPhotoFormat.jpeg.codec == .jpeg)
+        #expect(AGPhotoFormat.heif.fileType == .heic)
+        #expect(AGPhotoFormat.heif.codec == .hevc)
+
+        let manager = AGCameraManager()
+        try manager.setPhotoFormat(.heif)
+        #expect(manager.photoFormat == .heif)
+        #expect(manager.configuration.photoFormat == .heif)
+    }
+
+    @Test(arguments: [(UTType.jpeg, "jpg"), (UTType.heic, "heic")])
+    func encodedPhotoFileExtensionMatchesImageData(type: UTType, expectedExtension: String) throws {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64)).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+        }
+        let cgImage = try #require(image.cgImage)
+        let data = NSMutableData()
+        let destination = try #require(CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, cgImage, nil)
+        #expect(CGImageDestinationFinalize(destination))
+        #expect(AGPhotoFormat.fileExtension(for: data as Data) == expectedExtension)
     }
 
     @Test

@@ -214,6 +214,11 @@ private final class CameraSessionWorker: @unchecked Sendable {
             supportsWhiteBalanceLock: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported,
             supportedPhotoCodecs: output.availablePhotoCodecTypes,
             supportedPhotoFileTypes: output.availablePhotoFileTypes,
+            supportedPhotoFormats: AGPhotoFormat.allCases.filter { format in
+                guard let fileType = format.fileType, let codec = format.codec else { return true }
+                return output.availablePhotoFileTypes.contains(fileType)
+                    && output.supportedPhotoCodecTypes(for: fileType).contains(codec)
+            },
             supportedSessionPresets: supportedSessionPresetsOnQueue()
         )
     }

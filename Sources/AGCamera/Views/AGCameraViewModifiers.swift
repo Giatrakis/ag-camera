@@ -122,6 +122,10 @@ extension AGCameraView {
         overriding(\.photoQualityPrioritization, with: prioritization)
     }
 
+    public func photoFormat(_ format: AGPhotoFormat) -> Self {
+        overriding(\.photoFormat, with: format)
+    }
+
     public func livePhotoMode(_ mode: AGLivePhotoMode) -> Self {
         overriding(\.livePhotoMode, with: mode)
     }

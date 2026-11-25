@@ -40,9 +40,10 @@ public struct AGLivePhotoView: View {
         let token = UUID()
         requestToken = token
         placeholderImage = UIImage(data: capture.photoData)
+        guard let photoFileExtension = capture.photoFileExtension else { return }
         let stillURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("jpg")
+            .appendingPathExtension(photoFileExtension)
         do {
             try capture.photoData.write(to: stillURL)
             stillFileURL = stillURL

@@ -20,12 +20,13 @@ class AGMediaLibraryManager {
             throw CameraError.permissionDenied
         }
 
-        guard let image = UIImage(data: data) else {
+        guard AGPhotoFormat.fileExtension(for: data) != nil else {
             throw CameraError.captureFailed
         }
 
         try await PHPhotoLibrary.shared().performChanges {
-            PHAssetCreationRequest.creationRequestForAsset(from: image)
+            let request = PHAssetCreationRequest.forAsset()
+            request.addResource(with: .photo, data: data, options: nil)
         }
     }
 

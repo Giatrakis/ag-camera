@@ -20,6 +20,7 @@ public class AGCameraManager: NSObject {
     public private(set) var isRecording = false
     public private(set) var isPreparingVideoRecording = false
     public private(set) var livePhotoMode: AGLivePhotoMode = .off
+    public private(set) var photoFormat: AGPhotoFormat = .automatic
     public private(set) var isLivePhotoSupported = false
     public private(set) var isLivePhotoAvailable = false
     public private(set) var capabilities: AGCameraCapabilities?
@@ -84,6 +85,7 @@ public class AGCameraManager: NSObject {
         isSessionRunning
             && !isSwitchingCamera
             && photoCaptureReadiness == .ready
+            && (capabilities?.supportedPhotoFormats.contains(photoFormat) == true)
             && (livePhotoMode != .on || isLivePhotoAvailable)
     }
 
@@ -99,6 +101,7 @@ public class AGCameraManager: NSObject {
         self.permissionManager = AGPermissionManager()
         self.currentCameraPosition = configuration.defaultCameraPosition
         self.livePhotoMode = configuration.livePhotoMode
+        self.photoFormat = configuration.photoFormat
         let log = AGCameraLog(enabled: configuration.enableLogging)
         self.log = log
 
@@ -132,6 +135,7 @@ public class AGCameraManager: NSObject {
         self.flashMode = configuration.defaultFlashMode
         self.captureManager.flashMode = configuration.defaultFlashMode
         self.captureManager.photoQualityPrioritization = configuration.photoQualityPrioritization
+        self.captureManager.photoFormat = configuration.photoFormat
         self.captureManager.videoCodec = configuration.videoCodec
 
         captureManager.onRecordingStateChanged = { [weak self] isRecording, duration in
@@ -231,6 +235,7 @@ extension AGCameraManager {
             }
             captureManager.startMonitoringPhotoReadiness()
             livePhotoMode = configuration.livePhotoMode
+            photoFormat = configuration.photoFormat
             refreshLivePhotoState()
             sessionManager.configureVideoMirroring(
                 for: currentCameraPosition,
@@ -239,6 +244,7 @@ extension AGCameraManager {
 
             sessionManager.setPhotoQualityPrioritization(configuration.photoQualityPrioritization)
             captureManager.photoQualityPrioritization = configuration.photoQualityPrioritization
+            captureManager.photoFormat = configuration.photoFormat
             captureManager.videoCodec = configuration.videoCodec
             try await focusExposure.configureDefaultModes(
                 focusMode: configuration.defaultFocusMode,
@@ -252,6 +258,9 @@ extension AGCameraManager {
             refreshZoomState()
             try await refreshExposureBiasState()
             refreshCapabilities()
+            guard capabilities?.supportedPhotoFormats.contains(photoFormat) == true else {
+                throw CameraError.unsupportedPhotoFormat
+            }
 
             isSessionConfigured = true
             self.error = nil
@@ -772,6 +781,16 @@ extension AGCameraManager {
         configuration.photoQualityPrioritization = prioritization
     }
 
+    public func setPhotoFormat(_ format: AGPhotoFormat) throws {
+        guard !captureManager.isCapturingPhoto else { throw CameraError.captureFailed }
+        if let capabilities, !capabilities.supportedPhotoFormats.contains(format) {
+            throw CameraError.unsupportedPhotoFormat
+        }
+        photoFormat = format
+        captureManager.photoFormat = format
+        configuration.photoFormat = format
+    }
+
     public func setVideoCodec(_ codec: AVVideoCodecType?) {
         configuration.videoCodec = codec
         captureManager.videoCodec = codec
@@ -854,6 +873,7 @@ public enum CameraError: LocalizedError, Sendable, Equatable {
     case setupFailed
     case captureFailed
     case livePhotoUnavailable
+    case unsupportedPhotoFormat
     case recordingFailed
     case invalidConfiguration
     case cameraSwitchInProgress
@@ -872,6 +892,8 @@ public enum CameraError: LocalizedError, Sendable, Equatable {
             return "Failed to capture photo."
         case .livePhotoUnavailable:
             return "Live Photo capture is unavailable for this camera or session configuration."
+        case .unsupportedPhotoFormat:
+            return "The selected photo format is unavailable for this camera or session configuration."
         case .recordingFailed:
             return "Failed to record video."
         case .invalidConfiguration:

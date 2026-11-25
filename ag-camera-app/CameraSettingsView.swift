@@ -3,13 +3,19 @@ import SwiftUI
 import ag_camera
 
 struct CameraSettingsView: View {
+    let supportedPhotoFormats: [AGPhotoFormat]
     let onApply: (AGCameraConfiguration) -> Void
 
     @State private var draft: AGCameraConfiguration
 
     @Environment(\.dismiss) private var dismiss
 
-    init(configuration: AGCameraConfiguration, onApply: @escaping (AGCameraConfiguration) -> Void) {
+    init(
+        configuration: AGCameraConfiguration,
+        supportedPhotoFormats: [AGPhotoFormat],
+        onApply: @escaping (AGCameraConfiguration) -> Void
+    ) {
+        self.supportedPhotoFormats = supportedPhotoFormats
         self.onApply = onApply
         self._draft = State(initialValue: configuration)
     }
@@ -101,6 +107,12 @@ struct CameraSettingsView: View {
                 Text("Speed").tag(AVCapturePhotoOutput.QualityPrioritization.speed)
                 Text("Balanced").tag(AVCapturePhotoOutput.QualityPrioritization.balanced)
                 Text("Quality").tag(AVCapturePhotoOutput.QualityPrioritization.quality)
+            }
+            Picker("Photo format", selection: $draft.photoFormat) {
+                ForEach(AGPhotoFormat.allCases.filter { supportedPhotoFormats.contains($0) || draft.photoFormat == $0 }) { format in
+                    Text(format == .automatic ? "System default" : format == .jpeg ? "JPEG" : "HEIF")
+                        .tag(format)
+                }
             }
             Picker("Live Photo", selection: $draft.livePhotoMode) {
                 Text("Off").tag(AGLivePhotoMode.off)

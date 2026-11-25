@@ -35,7 +35,7 @@ For custom controls, apply `.showDefaultControls(false)`, place SwiftUI buttons 
 
 Use ``AGCameraConfiguration`` to supply settings when constructing a manager. The view's fluent modifiers are initial-only overrides applied before the first session setup. The manager remains the source of truth for live setting changes; changing modifiers while the view is mounted does not reconfigure an active session. Methods that cannot apply a requested camera setting throw ``CameraError``; handle these errors in custom controls.
 
-`capturePhoto()` returns encoded image data. `startVideoRecording()` returns the temporary recording URL when recording begins, and `stopVideoRecording()` returns the completed movie URL. Video methods are asynchronous. `setSessionPreset(_:)` is asynchronous and throws if the selected preset is unsupported.
+`capturePhoto()` returns encoded image data. Use ``AGPhotoFormat`` in the configuration, `.photoFormat(_:)` on the view, or `setPhotoFormat(_:)` on the manager to select JPEG or HEIF. The default `.automatic` preserves AVFoundation's choice. The active camera's `supportedPhotoFormats` lists available options. `startVideoRecording()` returns the temporary recording URL when recording begins, and `stopVideoRecording()` returns the completed movie URL. Video methods are asynchronous. `setSessionPreset(_:)` is asynchronous and throws if the selected preset is unsupported.
 
 After session setup, `AGCameraManager.capabilities` reports the active camera's supported controls, photo formats, and session presets. `isPhotoCaptureReady` combines the photo output's capture readiness with session and Live Photo state for custom shutter controls.
 
@@ -47,6 +47,7 @@ When using ``AGCameraManager`` without ``AGCameraView``, request camera permissi
 
 - ``AGCameraView``
 - ``AGCameraConfiguration``
+- ``AGPhotoFormat``
 
 ### Camera control and permissions
 

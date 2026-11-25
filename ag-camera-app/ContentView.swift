@@ -62,7 +62,11 @@ struct ContentView: View {
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
             case .settings:
-                CameraSettingsView(configuration: cameraManager.configuration, onApply: applySettings)
+                CameraSettingsView(
+                    configuration: cameraManager.configuration,
+                    supportedPhotoFormats: cameraManager.capabilities?.supportedPhotoFormats ?? AGPhotoFormat.allCases,
+                    onApply: applySettings
+                )
             case .photo(let photo):
                 CapturePhotoPreview(photo: photo, cameraManager: cameraManager)
             case .live(let capture):

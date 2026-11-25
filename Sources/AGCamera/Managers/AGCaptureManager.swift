@@ -23,6 +23,7 @@ class AGCaptureManager: NSObject {
 
     var flashMode: AVCaptureDevice.FlashMode = .off
     var photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization = .quality
+    var photoFormat: AGPhotoFormat = .automatic
     var videoCodec: AVVideoCodecType?
 
     private(set) var isRecording = false
@@ -77,6 +78,21 @@ class AGCaptureManager: NSObject {
         if live {
             guard sessionManager.livePhotoState.isEnabled else { throw CameraError.livePhotoUnavailable }
         }
+        let photoSettings: AVCapturePhotoSettings
+        if let fileType = photoFormat.fileType, let codec = photoFormat.codec {
+            guard photoOutput.availablePhotoFileTypes.contains(fileType),
+                  photoOutput.supportedPhotoCodecTypes(for: fileType).contains(codec) else {
+                throw CameraError.unsupportedPhotoFormat
+            }
+            photoSettings = AVCapturePhotoSettings(
+                rawPixelFormatType: 0,
+                rawFileType: nil,
+                processedFormat: [AVVideoCodecKey: codec.rawValue],
+                processedFileType: fileType
+            )
+        } else {
+            photoSettings = AVCapturePhotoSettings()
+        }
 
         let task = Task<AGPhotoCaptureResult, Error> {
             try await withCheckedThrowingContinuation { continuation in
@@ -86,7 +102,6 @@ class AGCaptureManager: NSObject {
                 self.photoProcessingResult = nil
                 self.livePhotoMovieResult = nil
 
-                let photoSettings = AVCapturePhotoSettings()
                 photoSettings.photoQualityPrioritization = photoQualityPrioritization
                 if live {
                     let movieURL = FileManager.default.temporaryDirectory
