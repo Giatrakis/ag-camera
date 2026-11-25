@@ -277,6 +277,7 @@ private extension AGCameraView {
                     .padding(12)
                     .background(Circle().fill(Color.black.opacity(0.5)))
             }
+            .disabled(!manager.isSessionRunning || manager.capabilities?.supportsFlash != true)
 
             if manager.isRecording {
                 AGVideoDurationView(duration: manager.formattedRecordingDuration)
@@ -304,6 +305,7 @@ private extension AGCameraView {
                                 Text(mode.title)
                             }
                         }
+                        .disabled(mode == .on && manager.capabilities?.supportsLivePhoto != true)
                     }
                 } label: {
                     Image(systemName: manager.livePhotoMode == .off ? "livephoto.slash" : "livephoto")
@@ -364,6 +366,7 @@ private extension AGCameraView {
                 present(error)
             }
         }
+        .disabled(!manager.isPhotoCaptureReady)
     }
     
     private var captureVideoButton: some View {

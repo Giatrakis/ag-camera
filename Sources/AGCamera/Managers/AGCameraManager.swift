@@ -22,6 +22,8 @@ public class AGCameraManager: NSObject {
     public private(set) var livePhotoMode: AGLivePhotoMode = .off
     public private(set) var isLivePhotoSupported = false
     public private(set) var isLivePhotoAvailable = false
+    public private(set) var capabilities: AGCameraCapabilities?
+    public private(set) var photoCaptureReadiness: AVCapturePhotoOutput.CaptureReadiness = .sessionNotRunning
     public private(set) var recordingDuration: TimeInterval = 0.0
     public private(set) var currentZoomFactor: CGFloat = 1.0
     public private(set) var lastZoomFactor: CGFloat = 1.0
@@ -77,6 +79,13 @@ public class AGCameraManager: NSObject {
 
     public var configuration: AGCameraConfiguration
     public let permissionManager: AGPermissionManager
+
+    public var isPhotoCaptureReady: Bool {
+        isSessionRunning
+            && !isSwitchingCamera
+            && photoCaptureReadiness == .ready
+            && (livePhotoMode != .on || isLivePhotoAvailable)
+    }
 
     private var configuredZoomMaximum: CGFloat {
         currentCameraPosition == .front
@@ -134,6 +143,9 @@ public class AGCameraManager: NSObject {
                 }
             }
         }
+        captureManager.onPhotoReadinessChanged = { [weak self] readiness in
+            self?.photoCaptureReadiness = readiness
+        }
     }
 
     private func reportError(_ failure: Error, fallback: CameraError) {
@@ -168,6 +180,10 @@ public class AGCameraManager: NSObject {
         let state = sessionManager.livePhotoState
         isLivePhotoSupported = state.isSupported
         isLivePhotoAvailable = state.isEnabled && permissionManager.isMicrophoneAuthorized
+    }
+
+    private func refreshCapabilities() {
+        capabilities = sessionManager.capabilities
     }
 }
 
@@ -213,6 +229,7 @@ extension AGCameraManager {
                     prepareLivePhoto: prepareLivePhoto
                 )
             }
+            captureManager.startMonitoringPhotoReadiness()
             livePhotoMode = configuration.livePhotoMode
             refreshLivePhotoState()
             sessionManager.configureVideoMirroring(
@@ -234,6 +251,7 @@ extension AGCameraManager {
             )
             refreshZoomState()
             try await refreshExposureBiasState()
+            refreshCapabilities()
 
             isSessionConfigured = true
             self.error = nil
@@ -274,6 +292,7 @@ extension AGCameraManager {
     public func addVideoDataOutput(_ output: AVCaptureVideoDataOutput) async throws {
         try await sessionManager.addVideoDataOutput(output)
         refreshZoomState()
+        refreshCapabilities()
     }
 
     public func handleAppBackground() {
@@ -408,6 +427,7 @@ extension AGCameraManager {
         livePhotoMode = mode
         configuration.livePhotoMode = mode
         refreshLivePhotoState()
+        refreshCapabilities()
     }
 }
 
@@ -436,6 +456,7 @@ extension AGCameraManager {
                 audioOutput: captureManager.recordingAudioOutput,
                 mirrorFrontCamera: configuration.mirrorFrontCamera
             )
+            refreshCapabilities()
         } catch {
             reportError(error, fallback: .recordingFailed)
             throw error
@@ -454,6 +475,7 @@ extension AGCameraManager {
             maximumZoomFactor: configuredZoomMaximum
         )
         refreshZoomState()
+        refreshCapabilities()
         captureManager.videoCodec = configuration.videoCodec
 
         let url: URL
@@ -482,6 +504,7 @@ extension AGCameraManager {
             keepAudioInput: false
         )
         refreshLivePhotoState()
+        refreshCapabilities()
         lastVideoURL = url
         lastStoppedVideoURL = url
         onVideoStopped?(url)
@@ -560,6 +583,7 @@ extension AGCameraManager {
                 }
             }
             refreshLivePhotoState()
+            refreshCapabilities()
             onCameraPositionChanged?(newPosition)
             onZoomChanged?(currentZoomFactor)
             if !zoomState.didApplyDeviceSettings {
@@ -739,6 +763,7 @@ extension AGCameraManager {
             _ = try? await sessionManager.configureLivePhotoCapture(enabled: true, keepAudioInput: false)
         }
         refreshLivePhotoState()
+        refreshCapabilities()
     }
 
     public func setPhotoQualityPrioritization(_ prioritization: AVCapturePhotoOutput.QualityPrioritization) {
@@ -773,6 +798,7 @@ extension AGCameraManager {
         try await qualitySettings.setFrameRate(fps: fps)
         configuration.videoFrameRate = fps
         refreshZoomState()
+        refreshCapabilities()
     }
 }
 

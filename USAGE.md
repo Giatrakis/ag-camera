@@ -31,6 +31,17 @@ struct CameraScreen: View {
 
 `AGCameraView` requests camera permission by default, configures the capture session, starts it while the view is visible, and stops it when the view disappears. It does not automatically save captures to Photos. The URL returned for a video is in the temporary directory; move it or save it before relying on long-term retention.
 
+`camera.capabilities` is `nil` until a session is configured. Its snapshot describes the active camera's flash, torch, Live Photo, focus, exposure, manual-control support, photo codecs and file types, and session presets. It refreshes after camera switches and relevant session changes. It reports hardware and current session support; permission-dependent Live Photo availability remains `camera.isLivePhotoAvailable`.
+
+`camera.photoCaptureReadiness` exposes AVFoundation's current readiness state. `camera.isPhotoCaptureReady` also checks session visibility, camera switching, and Live Photo availability when mode is On. Use it to disable a custom shutter; the built-in shutter already uses it. Readiness can briefly change during capture and processing.
+
+```swift
+Button("Capture") {
+    Task { _ = try await camera.captureSelectedPhoto() }
+}
+.disabled(!camera.isPhotoCaptureReady)
+```
+
 The demo app has a settings button above the preview. It exposes grid, tap behavior, mirroring, zoom, focus and exposure defaults, photo quality, Live Photo mode, session preset, video frame rate and codec, torch power, and logging. Tap **Apply** to create a new camera manager and session with those initial settings. The torch button beside Settings tests the chosen power level.
 
 Initial options can be supplied when creating the manager:

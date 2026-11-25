@@ -39,6 +39,8 @@ struct CameraScreen: View {
 
 `AGCameraView` requests camera access when permission handling is enabled. Video recordings and Live Photos request microphone access and require the host app's `NSMicrophoneUsageDescription`. The explicit save methods request photo library add access when needed. The camera requires a physical device for capture validation.
 
+After setup, `camera.capabilities` describes the active camera's supported controls, photo codecs and file types, and session presets. `camera.isPhotoCaptureReady` reports whether the shutter can respond now; the built-in photo button follows that state.
+
 See [USAGE.md](USAGE.md) for configuration, custom controls, and the manager API.
 
 ## Current scope

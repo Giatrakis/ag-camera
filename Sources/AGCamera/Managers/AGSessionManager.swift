@@ -40,6 +40,7 @@ final class AGSessionManager {
     var isConfigured: Bool { worker.isConfigured }
     var currentSessionPreset: AVCaptureSession.Preset { worker.currentSessionPreset }
     var supportedSessionPresets: [AVCaptureSession.Preset] { worker.supportedSessionPresets }
+    var capabilities: AGCameraCapabilities? { worker.capabilities }
 
     init(permissionManager: AGPermissionManager, log: AGCameraLog) {
         self.permissionManager = permissionManager
@@ -184,15 +185,37 @@ private final class CameraSessionWorker: @unchecked Sendable {
     var currentPosition: AVCaptureDevice.Position { queue.sync { storedCurrentPosition } }
     var isConfigured: Bool { queue.sync { storedIsConfigured } }
     var currentSessionPreset: AVCaptureSession.Preset { queue.sync { captureSession.sessionPreset } }
+    var capabilities: AGCameraCapabilities? { queue.sync { capabilitiesOnQueue() } }
     var supportedSessionPresets: [AVCaptureSession.Preset] {
-        queue.sync {
-            let presets: [AVCaptureSession.Preset] = [
-                .photo, .high, .medium, .low, .hd1280x720, .hd1920x1080,
-                .hd4K3840x2160, .iFrame960x540, .iFrame1280x720,
-                .vga640x480, .cif352x288
-            ]
-            return presets.filter { captureSession.canSetSessionPreset($0) }
-        }
+        queue.sync { supportedSessionPresetsOnQueue() }
+    }
+
+    private func supportedSessionPresetsOnQueue() -> [AVCaptureSession.Preset] {
+        let presets: [AVCaptureSession.Preset] = [
+            .photo, .high, .medium, .low, .hd1280x720, .hd1920x1080,
+            .hd4K3840x2160, .iFrame960x540, .iFrame1280x720,
+            .vga640x480, .cif352x288
+        ]
+        return presets.filter { captureSession.canSetSessionPreset($0) }
+    }
+
+    private func capabilitiesOnQueue() -> AGCameraCapabilities? {
+        guard storedIsConfigured, let device = storedCurrentDevice,
+              let output = storedPhotoOutput else { return nil }
+        return AGCameraCapabilities(
+            position: storedCurrentPosition,
+            supportsFlash: device.hasFlash && output.supportedFlashModes.contains(.on),
+            supportsTorch: device.hasTorch,
+            supportsLivePhoto: output.isLivePhotoCaptureSupported,
+            supportsFocusPoint: device.isFocusPointOfInterestSupported,
+            supportsExposurePoint: device.isExposurePointOfInterestSupported,
+            supportsManualFocus: device.isLockingFocusWithCustomLensPositionSupported,
+            supportsCustomExposure: device.isExposureModeSupported(.custom),
+            supportsWhiteBalanceLock: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported,
+            supportedPhotoCodecs: output.availablePhotoCodecTypes,
+            supportedPhotoFileTypes: output.availablePhotoFileTypes,
+            supportedSessionPresets: supportedSessionPresetsOnQueue()
+        )
     }
 
     func setupSession(

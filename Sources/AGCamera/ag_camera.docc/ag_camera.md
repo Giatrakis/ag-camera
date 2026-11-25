@@ -37,6 +37,8 @@ Use ``AGCameraConfiguration`` to supply settings when constructing a manager. Th
 
 `capturePhoto()` returns encoded image data. `startVideoRecording()` returns the temporary recording URL when recording begins, and `stopVideoRecording()` returns the completed movie URL. Video methods are asynchronous. `setSessionPreset(_:)` is asynchronous and throws if the selected preset is unsupported.
 
+After session setup, `AGCameraManager.capabilities` reports the active camera's supported controls, photo formats, and session presets. `isPhotoCaptureReady` combines the photo output's capture readiness with session and Live Photo state for custom shutter controls.
+
 When using ``AGCameraManager`` without ``AGCameraView``, request camera permission first, then call `setupSession()` and `startSession()`. Call `stopSession()` when capture is no longer needed. The start and stop methods queue work; observe `isSessionRunning` for their resulting state.
 
 ## Topics

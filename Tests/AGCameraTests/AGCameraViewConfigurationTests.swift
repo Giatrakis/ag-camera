@@ -9,6 +9,15 @@ import Testing
 @MainActor
 struct AGCameraViewConfigurationTests {
     @Test
+    func photoCaptureIsUnavailableBeforeSessionSetup() {
+        let manager = AGCameraManager()
+
+        #expect(manager.capabilities == nil)
+        #expect(manager.photoCaptureReadiness == .sessionNotRunning)
+        #expect(!manager.isPhotoCaptureReady)
+    }
+
+    @Test
     func modifiersKeepConfigurationOnTheViewUntilItAppears() {
         let manager = AGCameraManager()
 

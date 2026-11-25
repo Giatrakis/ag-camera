@@ -17,6 +17,7 @@ class AGCaptureManager: NSObject {
     private var pendingLivePhotoURL: URL?
     private var photoCaptureTask: Task<AGPhotoCaptureResult, Error>?
     private var isLivePhotoCapture = false
+    private var photoReadinessCoordinator: AVCapturePhotoOutputReadinessCoordinator?
     private var videoRecordingStartTask: Task<URL, Error>?
     private var videoRecordingStopTask: Task<URL, Error>?
 
@@ -31,6 +32,7 @@ class AGCaptureManager: NSObject {
     private var recordingStartTime: Date?
 
     var onRecordingStateChanged: ((Bool, TimeInterval) -> Void)?
+    var onPhotoReadinessChanged: ((AVCapturePhotoOutput.CaptureReadiness) -> Void)?
     var recordingVideoOutput: AVCaptureVideoDataOutput { videoRecorder.videoOutput }
     var recordingAudioOutput: AVCaptureAudioDataOutput { videoRecorder.audioOutput }
     var isCapturingPhoto: Bool { photoCaptureTask != nil }
@@ -40,6 +42,15 @@ class AGCaptureManager: NSObject {
         self.log = log
         self.videoRecorder = AGVideoRecordingWriter(log: log)
         super.init()
+    }
+
+    func startMonitoringPhotoReadiness() {
+        guard photoReadinessCoordinator == nil,
+              let output = sessionManager.photoOutput else { return }
+        let coordinator = AVCapturePhotoOutputReadinessCoordinator(photoOutput: output)
+        photoReadinessCoordinator = coordinator
+        coordinator.delegate = self
+        onPhotoReadinessChanged?(coordinator.captureReadiness)
     }
 
     func capturePhoto() async throws -> Data {
@@ -91,6 +102,7 @@ class AGCaptureManager: NSObject {
                     photoSettings.flashMode = flashMode
                 }
 
+                self.photoReadinessCoordinator?.startTrackingCaptureRequest(using: photoSettings)
                 photoOutput.capturePhoto(with: photoSettings, delegate: self)
             }
         }
@@ -249,7 +261,9 @@ extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
         didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings,
         error: Error?
     ) {
+        let requestID = resolvedSettings.uniqueID
         DispatchQueue.main.async {
+            self.photoReadinessCoordinator?.stopTrackingCaptureRequest(using: requestID)
             guard let completion = self.photoCaptureCompletion else { return }
             self.photoCaptureCompletion = nil
             let photoResult = Self.resolvedPhotoResult(
@@ -272,6 +286,17 @@ extension AGCaptureManager: AVCapturePhotoCaptureDelegate {
             self.livePhotoMovieResult = nil
             self.pendingLivePhotoURL = nil
             completion(result)
+        }
+    }
+}
+
+extension AGCaptureManager: AVCapturePhotoOutputReadinessCoordinatorDelegate {
+    nonisolated func readinessCoordinator(
+        _ coordinator: AVCapturePhotoOutputReadinessCoordinator,
+        captureReadinessDidChange captureReadiness: AVCapturePhotoOutput.CaptureReadiness
+    ) {
+        DispatchQueue.main.async {
+            self.onPhotoReadinessChanged?(captureReadiness)
         }
     }
 }
