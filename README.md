@@ -1,20 +1,39 @@
 # AGCamera
 
-AGCamera is a SwiftUI camera package for iOS 18 and later. It provides a ready-to-use camera view and an observable manager for still photos, Live Photos, video recording, focus, zoom, flash, torch, and camera switching. The SDK is under active development.
+**Beta · 0.1.0-beta.1** · iOS 18+
 
-Licensed under the [MIT License](LICENSE).
+AGCamera provides a SwiftUI camera view and an observable camera manager. Apps can use the built-in controls or supply their own SwiftUI interface without building a UIKit camera preview.
 
-## Add the package
+The public API is still evolving. Test capture behavior on a physical device before shipping an app that depends on this beta.
 
-Add this repository as a Swift package dependency in Xcode and link the `AGCamera` product to the app target. The package uses Swift 5 language mode and requires the Swift 6.0 toolchain or newer to evaluate its manifest.
+## Features
 
-Add these usage descriptions to the **host app** as needed:
+- Photo capture with automatic, JPEG, or HEIF output; Live Photos with Off, On, and Auto modes
+- Video recording with audio and front/back camera switching in a single movie
+- Preview controls for zoom, focus, exposure, flash, torch, grid, and photo aspect ratio
+- Device capability and capture-readiness reporting for custom controls
+- Configurable camera defaults and SwiftUI modifiers
+- An Xcode demo in [`Examples/AGCameraDemo`](Examples/AGCameraDemo)
 
-| Info.plist key | Required for |
+The built-in mode picker currently captures **Photo** and **Video**. Other mode names are visible as disabled labels while their capture implementations are in development.
+
+## Installation
+
+Add the package URL in Xcode or declare the beta version in `Package.swift`:
+
+```swift
+.package(url: "https://github.com/Giatrakis/ag-camera.git", exact: "0.1.0-beta.1")
+```
+
+Link the `AGCamera` product to the app target. AGCamera requires iOS 18 or later and a Swift 6 toolchain; its source uses Swift 5 language mode.
+
+Add the privacy descriptions needed by the host app:
+
+| Info.plist key | Used for |
 | --- | --- |
-| `NSCameraUsageDescription` | Camera preview and photo/video capture |
-| `NSMicrophoneUsageDescription` | Every video recording and Live Photos, which include sound |
-| `NSPhotoLibraryAddUsageDescription` | Saving media to the photo library |
+| `NSCameraUsageDescription` | Preview and capture |
+| `NSMicrophoneUsageDescription` | Video and Live Photos with audio |
+| `NSPhotoLibraryAddUsageDescription` | Saving to Photos |
 
 ## Quick start
 
@@ -37,14 +56,20 @@ struct CameraScreen: View {
 }
 ```
 
-`AGCameraView` requests camera access when permission handling is enabled. Video recordings and Live Photos request microphone access and require the host app's `NSMicrophoneUsageDescription`. The explicit save methods request photo library add access when needed. The camera requires a physical device for capture validation.
+`AGCameraView` requests camera access by default and manages the capture session while visible. Capture callbacks return media to the host app. The manager's recording URL is temporary; move or save the movie when it must persist.
 
-After setup, `camera.capabilities` describes the active camera's supported controls, photo formats, codecs, file types, and session presets. `camera.isPhotoCaptureReady` reports whether the shutter can respond now; the built-in photo button follows that state.
+## Custom controls
 
-The built-in controls provide flash and Live Photo toggles, a zoom row, photo/video shutters, a centered mode selector, camera rotation, and a recent-capture preview. The six-dot button opens a draggable panel with Flash, Live, and Aspect (4:3, 16:9, 1:1) controls. Host apps can connect their own gallery and style controls with `.onGalleryTap` and `.onStyleControlsTap`, or replace the six-dot action with `.onMoreControlsTap`.
+Apply `.showDefaultControls(false)` to hide the built-in interface, then call methods on `AGCameraManager` from custom SwiftUI buttons. The manager also exposes `capabilities`, `isPhotoCaptureReady`, the current zoom and exposure values, and their supported ranges. Initial behavior can be set with `AGCameraConfiguration` or view modifiers; use manager methods for changes after the session starts.
 
-See [USAGE.md](USAGE.md) for configuration, custom controls, and the manager API.
+See [USAGE.md](USAGE.md) for configuration, custom-control examples, permissions, capture results, and saving. [DocC documentation](Sources/AGCamera/ag_camera.docc/ag_camera.md) covers the main public types.
 
-## Current scope
+## Demo and tests
 
-The package supports one active capture session with still photos, Live Photos, JPEG/HEIF photo selection, and video recordings that can switch between front and back cameras. Video and microphone samples are written to one movie file; the video may briefly hold a frame while the camera input changes. It does not yet provide a full camera product surface such as an in-app media browser or a processing pipeline. The host app owns its permission descriptions and captured media handling. `AGCameraView` presents camera errors in an alert.
+Open `ag-camera.xcodeproj` and run the `ag-camera-app` scheme on an iPhone. The demo exercises the built-in controls and exposes configuration options through Settings. The `ag-camera` scheme runs the framework tests.
+
+AGCamera currently provides capture and direct camera controls, not a full media browser or editing pipeline. The host app owns long-term media storage. Video may briefly hold a frame when switching cameras during recording.
+
+## License
+
+AGCamera is available under the [MIT License](LICENSE).
