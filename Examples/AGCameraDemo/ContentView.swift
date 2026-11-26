@@ -80,7 +80,7 @@ struct ContentView: View {
         } message: {
             Text(controlErrorMessage)
         }
-        .modifier(CameraStatusBarVisibility())
+        .statusBarHidden()
     }
 
     private var customControls: some View {
@@ -340,17 +340,6 @@ private struct SharedRecording: Transferable {
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(exportedContentType: .quickTimeMovie) { recording in
             SentTransferredFile(recording.url)
-        }
-    }
-}
-
-private struct CameraStatusBarVisibility: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 27, *) {
-            content.toolbarVisibility(.hidden, for: .statusBar)
-        } else {
-            content.statusBarHidden()
         }
     }
 }

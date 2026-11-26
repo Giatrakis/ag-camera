@@ -1,6 +1,6 @@
 # AGCamera
 
-**Beta · 0.1.0-beta.1** · iOS 18+
+**Beta · 0.1.0-beta.2** · iOS 18+
 
 AGCamera provides a SwiftUI camera view and an observable camera manager. Apps can use the built-in controls or supply their own SwiftUI interface without building a UIKit camera preview.
 
@@ -22,7 +22,7 @@ The built-in mode picker currently captures **Photo** and **Video**. Other mode 
 Add the package URL in Xcode or declare the beta version in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/Giatrakis/ag-camera.git", exact: "0.1.0-beta.1")
+.package(url: "https://github.com/Giatrakis/ag-camera.git", exact: "0.1.0-beta.2")
 ```
 
 Link the `AGCamera` product to the app target. AGCamera requires iOS 18 or later and a Swift 6 toolchain; its source uses Swift 5 language mode.
