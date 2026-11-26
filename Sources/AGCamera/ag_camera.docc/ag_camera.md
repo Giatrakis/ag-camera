@@ -31,11 +31,15 @@ The view requests camera permission by default, then configures and starts the s
 
 For custom controls, apply `.showDefaultControls(false)`, place SwiftUI buttons above the view, and call the manager's photo, recording, and switching methods. No UIKit code is required in the host app.
 
+The built-in controls include flash and Live Photo toggles with status labels, a centered Photo/Video mode selector, capture and rotate buttons, and a recent-capture preview. The six-dot control opens a draggable Flash, Live, and Aspect sheet; `.onMoreControlsTap` replaces that action. The `ƒ` control uses `.onStyleControlsTap` for a host-provided action. Use `.onGalleryTap` to replace the recent-capture action with a host app gallery.
+
 ## Configure and control
 
 Use ``AGCameraConfiguration`` to supply settings when constructing a manager. The view's fluent modifiers are initial-only overrides applied before the first session setup. The manager remains the source of truth for live setting changes; changing modifiers while the view is mounted does not reconfigure an active session. Methods that cannot apply a requested camera setting throw ``CameraError``; handle these errors in custom controls.
 
 `capturePhoto()` returns encoded image data. Use ``AGPhotoFormat`` in the configuration, `.photoFormat(_:)` on the view, or `setPhotoFormat(_:)` on the manager to select JPEG or HEIF. The default `.automatic` preserves AVFoundation's choice. The active camera's `supportedPhotoFormats` lists available options. `startVideoRecording()` returns the temporary recording URL when recording begins, and `stopVideoRecording()` returns the completed movie URL. Video methods are asynchronous. `setSessionPreset(_:)` is asynchronous and throws if the selected preset is unsupported.
+
+Use ``AGPhotoAspectRatio`` in the configuration, `.photoAspectRatio(_:)` on the view, or `setPhotoAspectRatio(_:)` on the manager to choose 4:3, 16:9, or 1:1. The ratio crops the preview and encoded still image. Live Photo stills are cropped; their paired movies keep the camera's original dimensions.
 
 After session setup, `AGCameraManager.capabilities` reports the active camera's supported controls, photo formats, and session presets. `isPhotoCaptureReady` combines the photo output's capture readiness with session and Live Photo state for custom shutter controls.
 
@@ -48,6 +52,7 @@ When using ``AGCameraManager`` without ``AGCameraView``, request camera permissi
 - ``AGCameraView``
 - ``AGCameraConfiguration``
 - ``AGPhotoFormat``
+- ``AGPhotoAspectRatio``
 
 ### Camera control and permissions
 

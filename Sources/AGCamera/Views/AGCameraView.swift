@@ -12,6 +12,10 @@ public struct AGCameraView: View {
     var zoomChangedAction: ((CGFloat) -> Void)?
     var flashModeChangedAction: ((AVCaptureDevice.FlashMode) -> Void)?
     var errorAction: ((CameraError) -> Void)?
+    var galleryAction: (() -> Void)?
+    var galleryThumbnail: UIImage?
+    var styleControlsAction: (() -> Void)?
+    var moreControlsAction: (() -> Void)?
     var exposureBiasBinding: Binding<Float>?
 
     @State private var showError = false
@@ -26,6 +30,14 @@ public struct AGCameraView: View {
     @State private var displayedExposureBias: Float = 0
     @State private var zoomTask: Task<Void, Never>?
     @State private var visibleVideoRect = CGRect.zero
+    @State private var statusToast: AGCameraStatusToast?
+    @State private var isChangingLivePhotoMode = false
+    @State private var recentCapture: AGRecentCapture?
+    @State private var presentedRecentCapture: AGRecentCapture?
+    @State private var isMoreControlsPresented = false
+    @State private var isMoreControlsDetailPresented = false
+    @State private var shouldOpenStyleControlsAfterDismiss = false
+    @Namespace private var moreControlsNamespace
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -37,6 +49,22 @@ public struct AGCameraView: View {
 
     private var displayedConfiguration: AGCameraConfiguration {
         configuration
+    }
+
+    private var flashModeTitle: String {
+        switch manager.flashMode {
+        case .off: "Off"
+        case .auto: "Auto"
+        case .on: "On"
+        @unknown default: "Off"
+        }
+    }
+
+    private var previewVerticalOffset: CGFloat {
+        guard displayedConfiguration.showDefaultControls else { return 0 }
+        let croppedPhoto = manager.outputType == .photo && manager.photoAspectRatio != .fourThree
+        if croppedPhoto { return 36 }
+        return displayedConfiguration.videoGravity == .resizeAspect ? 55 : 0
     }
 
     public init(manager: AGCameraManager) {
@@ -51,26 +79,93 @@ public struct AGCameraView: View {
     }
     
     public var body: some View {
+        cameraLifecycle
+            .alert("Camera Error", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
+            }
+            .sheet(item: $presentedRecentCapture) { capture in
+                AGRecentCaptureView(capture: capture)
+            }
+            .sheet(isPresented: $isMoreControlsPresented, onDismiss: {
+                isMoreControlsDetailPresented = false
+                if shouldOpenStyleControlsAfterDismiss {
+                    shouldOpenStyleControlsAfterDismiss = false
+                    styleControlsAction?()
+                }
+            }) {
+                AGCameraMoreControlsView(
+                    isDetailPresented: $isMoreControlsDetailPresented,
+                    manager: manager,
+                    onFlashSelected: selectFlash,
+                    onLiveSelected: selectLivePhoto,
+                    onAspectSelected: selectPhotoAspectRatio
+                )
+                .navigationTransition(.zoom(sourceID: "moreControls", in: moreControlsNamespace))
+                .presentationBackgroundInteraction(.enabled)
+                .agCameraControlsSheetBackground()
+            }
+    }
+
+    private var cameraLayout: some View {
         ZStack {
-            cameraPreview
+            GeometryReader { geometry in
+                let cropPreview = manager.outputType == .photo && manager.photoAspectRatio != .fourThree
+                let isLandscape = geometry.size.width > geometry.size.height
+                let frameWidth = cropPreview && isLandscape
+                    ? min(geometry.size.width, geometry.size.height * manager.photoAspectRatio.landscapeRatio)
+                    : geometry.size.width
+                let frameHeight = cropPreview && !isLandscape
+                    ? min(geometry.size.height, geometry.size.width * manager.photoAspectRatio.landscapeRatio)
+                    : geometry.size.height
+                cameraPreview
+                    .frame(width: frameWidth, height: frameHeight)
+                    .clipped()
+                    .position(
+                        x: geometry.size.width / 2,
+                        y: geometry.size.height / 2 - previewVerticalOffset
+                    )
+            }
+
+            if isMoreControlsPresented {
+                Button {
+                    isMoreControlsPresented = false
+                } label: {
+                    Color.clear
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss camera controls")
+            }
 
             if displayedConfiguration.showDefaultControls {
                 VStack(spacing: 0) {
                     topControlsView
                     Spacer()
                     bottomControlsView
+                        .disabled(manager.isSwitchingCamera)
+                        .opacity(isMoreControlsPresented && !isMoreControlsDetailPresented ? 0 : 1)
+                        .allowsHitTesting(!isMoreControlsPresented || isMoreControlsDetailPresented)
+                        .accessibilityHidden(isMoreControlsPresented && !isMoreControlsDetailPresented)
+                        .animation(.easeOut(duration: 0.16), value: isMoreControlsPresented)
                 }
-                .disabled(manager.isSwitchingCamera)
             }
         }
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    private var cameraEvents: some View {
+        cameraLayout
         .onChange(of: manager.capturedImage) { _, newValue in
             if let image = newValue {
+                recentCapture = AGRecentCapture(content: .photo(image), thumbnail: image)
                 photoCaptureAction?(image)
             }
         }
         .onChange(of: manager.lastCapturedLivePhoto?.pairedVideoURL) { oldValue, newValue in
             guard oldValue != newValue, let capture = manager.lastCapturedLivePhoto else { return }
+            recentCapture = AGRecentCapture(content: .live(capture), thumbnail: UIImage(data: capture.photoData))
             livePhotoCaptureAction?(capture)
         }
         .onChange(of: manager.lastStartedVideoURL) { oldValue, newValue in
@@ -79,6 +174,7 @@ public struct AGCameraView: View {
         }
         .onChange(of: manager.lastStoppedVideoURL) { oldValue, newValue in
             guard let url = newValue, oldValue != newValue else { return }
+            recentCapture = AGRecentCapture(content: .video(url), thumbnail: nil)
             videoStoppedAction?(url)
         }
         .onChange(of: manager.currentZoomFactor) { _, newValue in
@@ -119,11 +215,16 @@ public struct AGCameraView: View {
                 present(error)
             }
         }
+    }
+
+    private var cameraLifecycle: some View {
+        cameraEvents
         .task {
             let initialConfiguration = configuration
             manager.configuration = initialConfiguration
             manager.setLoggingEnabled(initialConfiguration.enableLogging)
             manager.setFlashMode(initialConfiguration.defaultFlashMode)
+            manager.setPhotoAspectRatio(initialConfiguration.photoAspectRatio)
             manager.setViewActive(scenePhase == .active)
             if initialConfiguration.handlePermissions {
                 guard await manager.permissionManager.requestCameraPermission() else {
@@ -157,11 +258,6 @@ public struct AGCameraView: View {
                 break
             }
         }
-        .alert("Camera Error", isPresented: $showError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(errorMessage)
-        }
     }
 
     private var cameraPreview: some View {
@@ -169,7 +265,8 @@ public struct AGCameraView: View {
             session: manager.getCaptureSession(),
             isSessionConfigured: manager.isSessionConfigured,
             isSessionRunning: manager.isSessionRunning,
-            videoGravity: displayedConfiguration.videoGravity,
+            videoGravity: manager.outputType == .photo && manager.photoAspectRatio != .fourThree
+                ? .resizeAspectFill : displayedConfiguration.videoGravity,
             cameraPosition: manager.currentCameraPosition,
             mirrorFrontCamera: displayedConfiguration.mirrorFrontCamera,
             log: manager.log,
@@ -219,7 +316,6 @@ public struct AGCameraView: View {
                 .offset(x: visibleVideoRect.minX, y: visibleVideoRect.minY)
         }
         .overlay(alignment: .topLeading) { focusIndicatorOverlay }
-        .ignoresSafeArea()
     }
 
     @ViewBuilder
@@ -259,7 +355,6 @@ public struct AGCameraView: View {
             Image(uiImage: snapshot)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .ignoresSafeArea()
         }
     }
 }
@@ -267,80 +362,176 @@ public struct AGCameraView: View {
 // MARK: Default Controls
 private extension AGCameraView {
     private var topControlsView: some View {
-        HStack {
-            Button {
-                manager.toggleFlash()
-            } label: {
-                Image(systemName: manager.flashIconName)
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .padding(12)
-                    .background(Circle().fill(Color.black.opacity(0.5)))
-            }
-            .disabled(!manager.isSessionRunning || manager.capabilities?.supportsFlash != true)
-
-            if manager.isRecording {
-                AGVideoDurationView(duration: manager.formattedRecordingDuration)
-                    .frame(maxWidth: .infinity)
-                    .transition(.opacity)
-            } else {
-                Spacer()
-            }
-
+        HStack(spacing: 0) {
             if manager.outputType == .photo {
-                Menu {
-                    ForEach(AGLivePhotoMode.allCases) { mode in
-                        Button {
-                            Task {
-                                do {
-                                    try await manager.setLivePhotoMode(mode)
-                                } catch {
-                                    present(error)
-                                }
-                            }
-                        } label: {
-                            if manager.livePhotoMode == mode {
-                                Label(mode.title, systemImage: "checkmark")
-                            } else {
-                                Text(mode.title)
-                            }
-                        }
-                        .disabled(mode == .on && manager.capabilities?.supportsLivePhoto != true)
-                    }
-                } label: {
-                    Image(systemName: manager.livePhotoMode == .off ? "livephoto.slash" : "livephoto")
-                        .font(.title2)
-                        .foregroundStyle(manager.livePhotoMode == .on ? .yellow : .white)
-                        .padding(12)
-                        .background(Circle().fill(Color.black.opacity(0.5)))
+                Button(action: cycleFlash) {
+                    AGFlashModeIcon(mode: manager.flashMode, font: .body)
+                        .foregroundStyle(manager.flashMode == .on ? .yellow : .white)
+                        .contentTransition(.symbolEffect(.replace))
+                        .animation(.smooth(duration: 0.25), value: manager.flashMode)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Live Photo: \(manager.livePhotoMode.title)")
-                .disabled(!manager.isSessionRunning || manager.isSwitchingCamera)
-            }
+                .buttonStyle(AGCameraPressStyle())
+                .accessibilityLabel("Flash: \(flashModeTitle)")
 
+                Button(action: cycleLivePhoto) {
+                    AGLivePhotoModeIcon(mode: manager.livePhotoMode, font: .body)
+                        .foregroundStyle(manager.livePhotoMode == .on ? .yellow : .white)
+                        .contentTransition(.symbolEffect(.replace))
+                        .animation(.smooth(duration: 0.25), value: manager.livePhotoMode)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(AGCameraPressStyle())
+                .accessibilityLabel("Live Photo: \(manager.livePhotoMode.title)")
+
+                Color.clear
+                    .frame(width: 44, height: 44)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            } else if manager.isRecording {
+                AGVideoDurationView(duration: manager.formattedRecordingDuration)
+            }
         }
-        .padding()
+        .frame(maxWidth: .infinity)
+        .frame(height: 52)
+        .overlay(alignment: .top) {
+            if let statusToast {
+                AGCameraStatusToastView(toast: statusToast)
+                    .offset(y: 92)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+        }
+        .padding(.top, 12)
+        .task(id: statusToast?.id) {
+            guard let toastID = statusToast?.id else { return }
+            try? await Task.sleep(for: .seconds(1.2))
+            guard !Task.isCancelled, statusToast?.id == toastID else { return }
+            withAnimation(.easeInOut(duration: 0.18)) {
+                statusToast = nil
+            }
+        }
     }
     
     private var bottomControlsView: some View {
-        VStack(spacing: 30) {
+        VStack(spacing: 20) {
             zoomButton
-            
-            switch manager.outputType {
-            case .photo:
-                capturePhotoButton
-            case .video:
-                captureVideoButton
+                .offset(y: -12)
+
+            HStack {
+                styleControlsButton
+                    .frame(width: 48)
+                Spacer()
+                Group {
+                    switch manager.outputType {
+                    case .photo: capturePhotoButton
+                    case .video: captureVideoButton
+                    }
+                }
+                Spacer()
+                moreControlsButton
+                    .frame(width: 48)
+                    .opacity(isMoreControlsDetailPresented ? 0 : 1)
+                    .allowsHitTesting(!isMoreControlsDetailPresented)
             }
-            
-            HStack(spacing: 30) {
-                Circle().frame(width: 50, height: 50)
-                AGInputPickerButton(outputType: $manager.outputType)
-                switchCameraButton
+            .padding(.horizontal, 33)
+            .offset(y: isMoreControlsDetailPresented ? 0 : -4)
+
+            if !isMoreControlsDetailPresented {
+                HStack(spacing: 0) {
+                    galleryButton
+                        .frame(width: 48)
+                        .offset(x: 16)
+                    Spacer(minLength: 8)
+                    AGInputPickerButton(outputType: $manager.outputType, moreControlsNamespace: moreControlsNamespace)
+                        .frame(maxWidth: 220)
+                        .disabled(manager.isRecording || manager.isPreparingVideoRecording)
+                    Spacer(minLength: 8)
+                    switchCameraButton
+                        .frame(width: 48)
+                        .offset(x: -17)
+                }
+                .padding(.horizontal, 16)
+                .offset(y: 6)
             }
-            .padding(.horizontal)
         }
-        .padding(.bottom, 30)
+        .padding(.bottom, isMoreControlsDetailPresented ? 214 : 40)
+    }
+
+    private var styleControlsButton: some View {
+        Button {
+            if isMoreControlsDetailPresented {
+                shouldOpenStyleControlsAfterDismiss = styleControlsAction != nil
+                isMoreControlsPresented = false
+            } else {
+                styleControlsAction?()
+            }
+        } label: {
+            Image(systemName: "f.cursive")
+                .font(.body)
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(.white.opacity(0.1), in: Circle())
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(AGCameraPressStyle())
+        .accessibilityLabel("Style controls")
+        .opacity(manager.outputType == .video && styleControlsAction == nil ? 0.45 : 1)
+        .disabled(styleControlsAction == nil && !isMoreControlsDetailPresented)
+    }
+
+    private var moreControlsButton: some View {
+        Button {
+            if let moreControlsAction {
+                moreControlsAction()
+            } else {
+                isMoreControlsPresented = true
+            }
+        } label: {
+            VStack(spacing: 0) {
+                ForEach(0..<2, id: \.self) { _ in
+                    Image(systemName: "ellipsis")
+                        .font(.title3)
+                        .frame(height: 6)
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(width: 48, height: 48)
+            .background(.white.opacity(0.1), in: Circle())
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(AGCameraPressStyle())
+        .accessibilityLabel("More camera controls")
+        .disabled(manager.outputType != .photo && moreControlsAction == nil)
+    }
+
+    private var galleryButton: some View {
+        Button {
+            if let galleryAction {
+                galleryAction()
+            } else {
+                presentedRecentCapture = recentCapture
+            }
+        } label: {
+            Group {
+                if let thumbnail = galleryThumbnail ?? recentCapture?.thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: recentCapture == nil ? "photo.on.rectangle" : "video.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                }
+            }
+            .frame(width: 48, height: 48)
+            .agCameraGlassCircle()
+            .clipShape(Circle())
+        }
+        .buttonStyle(AGCameraPressStyle())
+        .accessibilityLabel("Recent capture")
+        .disabled(galleryAction == nil && recentCapture == nil)
     }
     
     private var zoomButton: some View {
@@ -356,10 +547,20 @@ private extension AGCameraView {
             }
         }
         .disabled(!manager.isSessionRunning)
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                if isMoreControlsDetailPresented {
+                    isMoreControlsPresented = false
+                }
+            }
+        )
     }
     
     private var capturePhotoButton: some View {
         AGCapturePhotoButton {
+            if isMoreControlsDetailPresented {
+                isMoreControlsPresented = false
+            }
             do {
                 _ = try await manager.captureSelectedPhoto()
             } catch {
@@ -399,6 +600,100 @@ private extension AGCameraView {
 
 // MARK: Useful Methods
 private extension AGCameraView {
+    private func cycleFlash() {
+        defer {
+            if isMoreControlsPresented { isMoreControlsPresented = false }
+        }
+        guard manager.isSessionConfigured else {
+            showStatus("CAMERA STARTING", highlighted: false)
+            return
+        }
+        guard !manager.isSwitchingCamera else {
+            showStatus("CAMERA SWITCHING", highlighted: false)
+            return
+        }
+        guard manager.capabilities?.supportsFlash == true else {
+            showStatus("FLASH UNAVAILABLE", highlighted: false)
+            return
+        }
+        manager.toggleFlash()
+        showStatus("FLASH \(flashModeTitle.uppercased())", highlighted: manager.flashMode != .off)
+    }
+
+    private func cycleLivePhoto() {
+        defer {
+            if isMoreControlsPresented { isMoreControlsPresented = false }
+        }
+        guard manager.isSessionConfigured else {
+            showStatus("CAMERA STARTING", highlighted: false)
+            return
+        }
+        guard !manager.isSwitchingCamera else {
+            showStatus("CAMERA SWITCHING", highlighted: false)
+            return
+        }
+        guard !isChangingLivePhotoMode else {
+            showStatus("LIVE UPDATING", highlighted: false)
+            return
+        }
+        let nextMode: AGLivePhotoMode
+        if manager.capabilities?.supportsLivePhoto != true {
+            guard manager.livePhotoMode != .off else {
+                showStatus("LIVE UNAVAILABLE", highlighted: false)
+                return
+            }
+            nextMode = .off
+        } else {
+            switch manager.livePhotoMode {
+            case .auto: nextMode = .off
+            case .off: nextMode = .on
+            case .on: nextMode = .auto
+            }
+        }
+        selectLivePhoto(nextMode)
+    }
+
+    private func selectFlash(_ mode: AVCaptureDevice.FlashMode) {
+        guard manager.isSessionConfigured, !manager.isSwitchingCamera else { return }
+        guard mode == .off || manager.capabilities?.supportsFlash == true else {
+            showStatus("FLASH UNAVAILABLE", highlighted: false)
+            return
+        }
+        manager.setFlashMode(mode)
+        showStatus("FLASH \(flashModeTitle.uppercased())", highlighted: mode != .off)
+    }
+
+    private func selectLivePhoto(_ mode: AGLivePhotoMode) {
+        guard manager.isSessionConfigured, !manager.isSwitchingCamera, !isChangingLivePhotoMode else { return }
+        guard mode == .off || manager.capabilities?.supportsLivePhoto == true else {
+            showStatus("LIVE UNAVAILABLE", highlighted: false)
+            return
+        }
+        isChangingLivePhotoMode = true
+        Task {
+            defer { isChangingLivePhotoMode = false }
+            do {
+                try await manager.setLivePhotoMode(mode)
+                showStatus(
+                    mode == .on ? "LIVE" : "LIVE \(mode.title.uppercased())",
+                    highlighted: mode != .off
+                )
+            } catch {
+                present(error)
+            }
+        }
+    }
+
+    private func selectPhotoAspectRatio(_ ratio: AGPhotoAspectRatio) {
+        manager.setPhotoAspectRatio(ratio)
+    }
+
+    private func showStatus(_ title: String, highlighted: Bool) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            statusToast = AGCameraStatusToast(title: title, highlighted: highlighted)
+        }
+    }
+
     private func setupCamera() async {
         guard !manager.isSessionConfigured else { return }
         do {

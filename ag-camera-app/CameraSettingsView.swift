@@ -76,7 +76,7 @@ struct CameraSettingsView: View {
                 step: 0.5
             )
             Stepper("Front zoom limit: \(Int(draft.maxFrontZoomFactor))×", value: $draft.maxFrontZoomFactor, in: 1...5)
-            Stepper("Rear zoom limit: \(Int(draft.maxBackZoomFactor))×", value: $draft.maxBackZoomFactor, in: 1...15)
+            Stepper("Rear zoom limit: \(Int(draft.maxBackZoomFactor))×", value: $draft.maxBackZoomFactor, in: 1...40)
             HStack {
                 Text("Torch power")
                 Slider(value: $draft.torchLevel, in: 0...1)

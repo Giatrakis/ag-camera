@@ -11,6 +11,7 @@ class AGZoomManager {
 
     private let sessionManager: AGSessionManager
     private let log: AGCameraLog
+    private var focalLengthCache: (deviceID: String, anchors: [(zoom: CGFloat, focalLength: CGFloat)])?
 
     private var displayZoomMultiplier: CGFloat {
         guard let device = sessionManager.currentDevice else { return 1.0 }
@@ -43,7 +44,7 @@ class AGZoomManager {
             }
             let hardwareMinimum = device.minAvailableVideoZoomFactor * multiplier
             let hardwareMaximum = device.maxAvailableVideoZoomFactor * multiplier
-            let defaultMaximum: CGFloat = position == .front ? 3.0 : 15.0
+            let defaultMaximum: CGFloat = position == .front ? 3.0 : 40.0
             let requestedMaximum = maximumZoomFactor ?? defaultMaximum
             let maxUIZoom = max(hardwareMinimum, min(requestedMaximum, hardwareMaximum))
             let requestedZoom = min(max(factor, hardwareMinimum), maxUIZoom)
@@ -63,7 +64,7 @@ class AGZoomManager {
         guard let device = sessionManager.currentDevice else { return 1.0 }
         let hardwareMinimum = device.minAvailableVideoZoomFactor * displayZoomMultiplier
         let hardwareMaximum = device.maxAvailableVideoZoomFactor * displayZoomMultiplier
-        let defaultMaximum: CGFloat = position == .front ? 3.0 : 15.0
+        let defaultMaximum: CGFloat = position == .front ? 3.0 : 40.0
         let requestedMaximum = configuredMaximum ?? defaultMaximum
         return max(hardwareMinimum, min(requestedMaximum, hardwareMaximum))
     }
@@ -76,6 +77,39 @@ class AGZoomManager {
     func getCurrentZoomFactor() -> CGFloat {
         guard let device = sessionManager.currentDevice else { return 1.0 }
         return device.videoZoomFactor * displayZoomMultiplier
+    }
+
+    func estimatedFocalLengthIn35mmFilm(for displayZoom: CGFloat) -> Int? {
+        guard #available(iOS 26.0, *), displayZoom.isFinite, displayZoom > 0,
+              let device = sessionManager.currentDevice else { return nil }
+
+        if focalLengthCache?.deviceID != device.uniqueID {
+            let lenses = device.constituentDevices.isEmpty ? [device] : device.constituentDevices
+            let wideLens = lenses.first(where: { $0.deviceType == .builtInWideAngleCamera }) ?? lenses.first
+            let wideFocalLength = CGFloat(wideLens?.nominalFocalLengthIn35mmFilm ?? 0)
+            let anchors: [(zoom: CGFloat, focalLength: CGFloat)] = lenses.compactMap { lens in
+                let focalLength = CGFloat(lens.nominalFocalLengthIn35mmFilm)
+                guard focalLength > 0, wideFocalLength > 0 else { return nil }
+                let relativeZoom = focalLength / wideFocalLength
+                guard let stop = [CGFloat(0.5), 1, 2, 4, 8].min(by: {
+                    abs(log2($0 / relativeZoom)) < abs(log2($1 / relativeZoom))
+                }) else { return nil }
+                return (stop, focalLength)
+            }
+            focalLengthCache = (device.uniqueID, anchors)
+        }
+        guard let anchor = focalLengthCache?.anchors.min(by: {
+            abs(log2($0.zoom / displayZoom)) < abs(log2($1.zoom / displayZoom))
+        }) else { return nil }
+        return Int((anchor.focalLength * displayZoom / anchor.zoom).rounded())
+    }
+
+    func physicalLensFocalLengthIn35mmFilm(at displayZoom: CGFloat) -> Int? {
+        guard estimatedFocalLengthIn35mmFilm(for: displayZoom) != nil else { return nil }
+        guard let anchor = focalLengthCache?.anchors.first(where: { abs($0.zoom - displayZoom) < 0.01 }) else {
+            return nil
+        }
+        return Int(anchor.focalLength.rounded())
     }
 
     func getAvailableZoomLevels(maximumZoomFactor: CGFloat) -> [CGFloat] {

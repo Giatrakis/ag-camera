@@ -41,6 +41,8 @@ struct CameraScreen: View {
 
 After setup, `camera.capabilities` describes the active camera's supported controls, photo formats, codecs, file types, and session presets. `camera.isPhotoCaptureReady` reports whether the shutter can respond now; the built-in photo button follows that state.
 
+The built-in controls provide flash and Live Photo toggles, a zoom row, photo/video shutters, a centered mode selector, camera rotation, and a recent-capture preview. The six-dot button opens a draggable panel with Flash, Live, and Aspect (4:3, 16:9, 1:1) controls. Host apps can connect their own gallery and style controls with `.onGalleryTap` and `.onStyleControlsTap`, or replace the six-dot action with `.onMoreControlsTap`.
+
 See [USAGE.md](USAGE.md) for configuration, custom controls, and the manager API.
 
 ## Current scope

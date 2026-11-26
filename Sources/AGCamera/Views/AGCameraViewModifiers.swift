@@ -56,6 +56,30 @@ extension AGCameraView {
         return view
     }
 
+    public func onGalleryTap(_ action: @escaping () -> Void) -> Self {
+        var view = self
+        view.galleryAction = action
+        return view
+    }
+
+    public func galleryThumbnail(_ image: UIImage?) -> Self {
+        var view = self
+        view.galleryThumbnail = image
+        return view
+    }
+
+    public func onStyleControlsTap(_ action: @escaping () -> Void) -> Self {
+        var view = self
+        view.styleControlsAction = action
+        return view
+    }
+
+    public func onMoreControlsTap(_ action: @escaping () -> Void) -> Self {
+        var view = self
+        view.moreControlsAction = action
+        return view
+    }
+
     public func handlePermissions(_ enabled: Bool) -> Self {
         overriding(\.handlePermissions, with: enabled)
     }
@@ -124,6 +148,10 @@ extension AGCameraView {
 
     public func photoFormat(_ format: AGPhotoFormat) -> Self {
         overriding(\.photoFormat, with: format)
+    }
+
+    public func photoAspectRatio(_ ratio: AGPhotoAspectRatio) -> Self {
+        overriding(\.photoAspectRatio, with: ratio)
     }
 
     public func livePhotoMode(_ mode: AGLivePhotoMode) -> Self {

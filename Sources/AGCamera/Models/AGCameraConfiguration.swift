@@ -28,6 +28,7 @@ public struct AGCameraConfiguration {
     public var defaultExposureMode: AVCaptureDevice.ExposureMode
     public var photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization
     public var photoFormat: AGPhotoFormat
+    public var photoAspectRatio: AGPhotoAspectRatio
     public var livePhotoMode: AGLivePhotoMode
     public var sessionPreset: AVCaptureSession.Preset
     public var videoFrameRate: Int32
@@ -46,13 +47,14 @@ public struct AGCameraConfiguration {
         defaultFlashMode: AVCaptureDevice.FlashMode = .off,
         defaultZoomScale: CGFloat = 1.0,
         maxFrontZoomFactor: CGFloat = 3.0,
-        maxBackZoomFactor: CGFloat = 15.0,
+        maxBackZoomFactor: CGFloat = 40.0,
         mirrorFrontCamera: Bool = true,
         torchLevel: Float = 1.0,
         defaultFocusMode: AVCaptureDevice.FocusMode = .continuousAutoFocus,
         defaultExposureMode: AVCaptureDevice.ExposureMode = .continuousAutoExposure,
         photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization = .quality,
         photoFormat: AGPhotoFormat = .automatic,
+        photoAspectRatio: AGPhotoAspectRatio = .fourThree,
         livePhotoMode: AGLivePhotoMode = .off,
         sessionPreset: AVCaptureSession.Preset = .photo,
         videoFrameRate: Int32 = 30,
@@ -76,6 +78,7 @@ public struct AGCameraConfiguration {
         self.defaultExposureMode = defaultExposureMode
         self.photoQualityPrioritization = photoQualityPrioritization
         self.photoFormat = photoFormat
+        self.photoAspectRatio = photoAspectRatio
         self.livePhotoMode = livePhotoMode
         self.sessionPreset = sessionPreset
         self.videoFrameRate = videoFrameRate

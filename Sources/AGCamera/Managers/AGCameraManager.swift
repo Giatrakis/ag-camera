@@ -21,6 +21,7 @@ public class AGCameraManager: NSObject {
     public private(set) var isPreparingVideoRecording = false
     public private(set) var livePhotoMode: AGLivePhotoMode = .off
     public private(set) var photoFormat: AGPhotoFormat = .automatic
+    public private(set) var photoAspectRatio: AGPhotoAspectRatio = .fourThree
     public private(set) var isLivePhotoSupported = false
     public private(set) var isLivePhotoAvailable = false
     public private(set) var capabilities: AGCameraCapabilities?
@@ -102,6 +103,7 @@ public class AGCameraManager: NSObject {
         self.currentCameraPosition = configuration.defaultCameraPosition
         self.livePhotoMode = configuration.livePhotoMode
         self.photoFormat = configuration.photoFormat
+        self.photoAspectRatio = configuration.photoAspectRatio
         let log = AGCameraLog(enabled: configuration.enableLogging)
         self.log = log
 
@@ -236,6 +238,7 @@ extension AGCameraManager {
             captureManager.startMonitoringPhotoReadiness()
             livePhotoMode = configuration.livePhotoMode
             photoFormat = configuration.photoFormat
+            photoAspectRatio = configuration.photoAspectRatio
             refreshLivePhotoState()
             sessionManager.configureVideoMirroring(
                 for: currentCameraPosition,
@@ -349,7 +352,11 @@ extension AGCameraManager {
 
         let data: Data
         do {
-            data = try await captureManager.capturePhoto()
+            let rawData = try await captureManager.capturePhoto()
+            let aspectRatio = photoAspectRatio
+            data = try await Task.detached(priority: .userInitiated) {
+                try AGPhotoAspectProcessor.crop(rawData, to: aspectRatio)
+            }.value
         } catch {
             reportError(error, fallback: .captureFailed)
             throw error
@@ -372,7 +379,15 @@ extension AGCameraManager {
         guard isLivePhotoAvailable else { throw CameraError.livePhotoUnavailable }
 
         do {
-            let capture = try await captureManager.captureLivePhoto()
+            let rawCapture = try await captureManager.captureLivePhoto()
+            let aspectRatio = photoAspectRatio
+            let data = try await Task.detached(priority: .userInitiated) {
+                try AGPhotoAspectProcessor.crop(rawCapture.photoData, to: aspectRatio)
+            }.value
+            let capture = AGLivePhotoCapture(
+                photoData: data,
+                pairedVideoURL: rawCapture.pairedVideoURL
+            )
             lastCapturedLivePhoto = capture
             onLivePhotoCapture?(capture)
             return capture
@@ -627,10 +642,10 @@ extension AGCameraManager {
         let newMode: AVCaptureDevice.FlashMode
         switch flashMode {
         case .off:
-            newMode = .on
-        case .on:
             newMode = .auto
         case .auto:
+            newMode = .on
+        case .on:
             newMode = .off
         @unknown default:
             newMode = .off
@@ -724,6 +739,14 @@ extension AGCameraManager {
 
 extension AGCameraManager {
 
+    func estimatedFocalLengthIn35mmFilm(for zoomFactor: CGFloat) -> Int? {
+        zoomManager.estimatedFocalLengthIn35mmFilm(for: zoomFactor)
+    }
+
+    func physicalLensFocalLengthIn35mmFilm(at zoomFactor: CGFloat) -> Int? {
+        zoomManager.physicalLensFocalLengthIn35mmFilm(at: zoomFactor)
+    }
+
     public func setZoom(factor: CGFloat) async throws {
         guard !Task.isCancelled else { return }
         zoomCommandID += 1
@@ -791,6 +814,11 @@ extension AGCameraManager {
         configuration.photoFormat = format
     }
 
+    public func setPhotoAspectRatio(_ ratio: AGPhotoAspectRatio) {
+        photoAspectRatio = ratio
+        configuration.photoAspectRatio = ratio
+    }
+
     public func setVideoCodec(_ codec: AVVideoCodecType?) {
         configuration.videoCodec = codec
         captureManager.videoCodec = codec
@@ -843,7 +871,11 @@ extension AGCameraManager {
 extension AGCameraManager {
 
     public var flashIconName: String {
-        switch flashMode {
+        Self.flashIconName(for: flashMode)
+    }
+
+    static func flashIconName(for mode: AVCaptureDevice.FlashMode) -> String {
+        switch mode {
         case .off:
             return "bolt.slash"
         case .on:
