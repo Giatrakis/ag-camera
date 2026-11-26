@@ -36,6 +36,7 @@ public struct AGCameraView: View {
     @State private var presentedRecentCapture: AGRecentCapture?
     @State private var isMoreControlsPresented = false
     @State private var isMoreControlsDetailPresented = false
+    @State private var isModePickerExpanded = false
     @State private var shouldOpenStyleControlsAfterDismiss = false
     @Namespace private var moreControlsNamespace
 
@@ -439,20 +440,29 @@ private extension AGCameraView {
             .offset(y: isMoreControlsDetailPresented ? 0 : -4)
 
             if !isMoreControlsDetailPresented {
-                HStack(spacing: 0) {
-                    galleryButton
-                        .frame(width: 48)
-                        .offset(x: 16)
-                    Spacer(minLength: 8)
-                    AGInputPickerButton(outputType: $manager.outputType, moreControlsNamespace: moreControlsNamespace)
-                        .frame(maxWidth: 220)
+                ZStack {
+                    AGInputPickerButton(
+                        outputType: $manager.outputType,
+                        moreControlsNamespace: moreControlsNamespace,
+                        onInteractionChanged: { isModePickerExpanded = $0 }
+                    )
                         .disabled(manager.isRecording || manager.isPreparingVideoRecording)
-                    Spacer(minLength: 8)
-                    switchCameraButton
-                        .frame(width: 48)
-                        .offset(x: -17)
+
+                    HStack(spacing: 0) {
+                        galleryButton
+                            .frame(width: 48)
+                            .offset(x: 16)
+                        Spacer()
+                        switchCameraButton
+                            .frame(width: 48)
+                            .offset(x: -17)
+                    }
+                    .padding(.horizontal, 16)
+                    .opacity(isModePickerExpanded ? 0 : 1)
+                    .allowsHitTesting(!isModePickerExpanded)
+                    .accessibilityHidden(isModePickerExpanded)
+                    .animation(.easeOut(duration: 0.15), value: isModePickerExpanded)
                 }
-                .padding(.horizontal, 16)
                 .offset(y: 6)
             }
         }
